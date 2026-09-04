@@ -1,0 +1,28 @@
+{
+  "name": "GiroLucro — Lucro real na pista",
+  "short_name": "GiroLucro",
+  "description": "Descubra quanto sobra de verdade: lucro por hora e por km, comparativo Uber × 99 × iFood, metas e oficina.",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#08090c",
+  "theme_color": "#08090c",
+  "categories": ["finance", "productivity", "business"],
+  "icons": [
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

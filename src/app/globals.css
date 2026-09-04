@@ -1,0 +1,115 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --color-ink-950: #08090c;
+  --color-ink-900: #0c0e12;
+  --color-ink-850: #10131a;
+  --color-ink-800: #151a22;
+  --color-ink-700: #1d232e;
+  --color-ink-600: #2a3240;
+
+  --color-volt-300: #d4ff7a;
+  --color-volt-400: #b8f53c;
+  --color-volt-500: #9ee51c;
+  --color-volt-600: #7fc70a;
+
+  --color-rose-450: #fb7185;
+
+  --shadow-glow: 0 0 44px rgba(184, 245, 60, 0.16);
+  --shadow-card: 0 18px 40px -18px rgba(0, 0, 0, 0.65);
+
+  --animate-pulse-soft: pulseSoft 2.6s ease-in-out infinite;
+  --animate-marquee: marquee 22s linear infinite;
+
+  @keyframes pulseSoft {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+  }
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+}
+
+html {
+  color-scheme: dark;
+  scroll-behavior: smooth;
+}
+
+body {
+  background: #050608;
+  background-image:
+    radial-gradient(120% 70% at 50% -10%, rgba(184, 245, 60, 0.07), transparent 60%),
+    radial-gradient(90% 60% at 100% 110%, rgba(56, 130, 246, 0.06), transparent 60%),
+    radial-gradient(80% 50% at 0% 100%, rgba(234, 29, 44, 0.05), transparent 60%);
+  background-attachment: fixed;
+  -webkit-tap-highlight-color: transparent;
+  text-rendering: optimizeLegibility;
+}
+
+/* Faixa central do app (estilo app mobile sobre fundo ambiente) */
+.app-shell {
+  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 120px rgba(0, 0, 0, 0.8);
+}
+
+/* Textura de asfalto/grade sutil */
+.texture-road {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: linear-gradient(to bottom, black, transparent 85%);
+  -webkit-mask-image: linear-gradient(to bottom, black, transparent 85%);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+input[type="text"],
+input[type="number"],
+input[type="date"],
+textarea,
+select {
+  outline: none;
+}
+
+/* remove spinners */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+
+/* input date no dark */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
+}
+
+/* Segmented underline anim */
+.pressable {
+  transition: transform 0.13s cubic-bezier(0.2, 0.8, 0.3, 1), opacity 0.13s ease, background-color 0.2s ease, border-color 0.2s ease;
+}
+.pressable:active {
+  transform: scale(0.955);
+}
+
+.card-hover {
+  transition: border-color 0.25s ease, transform 0.25s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.card-hover:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+/* gráficos recharts */
+.recharts-wrapper:focus { outline: none; }
