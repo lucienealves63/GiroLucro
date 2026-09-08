@@ -1,5 +1,5 @@
 import { BillingClient } from "@/components/billing";
-import { requireUser, trialDaysLeft } from "@/lib/auth";
+import { hasAccess, requireUser, trialDaysLeft } from "@/lib/auth";
 import { PLANS, PRO_FEATURES } from "@/lib/billing";
 
 export const dynamic = "force-dynamic";

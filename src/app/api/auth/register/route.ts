@@ -27,9 +27,9 @@ export async function POST(req: Request) {
     if (!EMAIL_RE.test(email)) {
       return NextResponse.json({ error: "E-mail inválido" }, { status: 400 });
     }
-    if (password.length < 6 || password.length > 72) {
+    if (password.length < 8 || password.length > 72) {
       return NextResponse.json(
-        { error: "A senha precisa de pelo menos 6 caracteres" },
+        { error: "A senha precisa ter entre 8 e 72 caracteres" },
         { status: 400 },
       );
     }

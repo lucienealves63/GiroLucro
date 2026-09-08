@@ -1,10 +1,9 @@
-/* GiroLucro service worker — mínimo para instalabilidade PWA.
-   Dados vivem no servidor (só funcionam online); o SW só garante o shell. */
-const CACHE = "girolucro-v1";
+/* GiroLucro service worker — PWA + Web Push. */
+const CACHE = "girolucro-v2";
 const SHELL = ["/manifest.webmanifest", "/icons/icon-512.png"];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)));
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));
   self.skipWaiting();
 });
 
@@ -13,7 +12,7 @@ self.addEventListener("activate", (event) => {
     caches
       .keys()
       .then((keys) =>
-        Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))),
+        Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))),
       ),
   );
   self.clients.claim();
@@ -21,10 +20,47 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
-  // nunca intercepta API, auth ou métodos não-GET
   if (event.request.method !== "GET" || url.pathname.startsWith("/api")) return;
-  // network-first com fallback ao cache (shell)
-  event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request)),
+  event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
+});
+
+self.addEventListener("push", (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch {
+    payload = { body: event.data ? event.data.text() : "Você tem um novo lembrete." };
+  }
+
+  const options = {
+    body: payload.body || "Abra o GiroLucro para conferir.",
+    icon: payload.icon || "/icons/icon-512.png",
+    badge: payload.badge || "/icons/icon-512.png",
+    tag: payload.tag || "girolucro",
+    renotify: true,
+    requireInteraction: payload.requireInteraction === true,
+    actions: payload.actions || [],
+    data: { url: payload.url || "/" },
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(payload.title || "GiroLucro", options),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const destination = new URL(event.notification.data?.url || "/", self.location.origin).href;
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if (client.url.startsWith(self.location.origin) && "focus" in client) {
+          client.navigate(destination);
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow ? self.clients.openWindow(destination) : undefined;
+    }),
   );
 });

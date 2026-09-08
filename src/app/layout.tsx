@@ -4,6 +4,7 @@ import { Inter, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { BottomNav } from "@/components/bottom-nav";
 import { ServiceWorkerRegister } from "@/components/sw-register";
+import { NotificationPrompt } from "@/components/notification-prompt";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -56,6 +57,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <main className="relative z-10 flex-1 pb-28">{children}</main>
           <BottomNav />
           <ServiceWorkerRegister />
+          <NotificationPrompt />
         </div>
       </body>
     </html>

@@ -5,8 +5,17 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: "*",
-        allow: ["/entrar", "/criar-conta"],
-        disallow: ["/api", "/comparar", "/metas", "/manutencao", "/registrar", "/configuracoes", "/assinatura"],
+        allow: ["/entrar", "/criar-conta", "/esqueci-senha"],
+        disallow: [
+          "/api",
+          "/redefinir-senha",
+          "/comparar",
+          "/metas",
+          "/manutencao",
+          "/registrar",
+          "/configuracoes",
+          "/assinatura",
+        ],
       },
     ],
   };

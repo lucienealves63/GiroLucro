@@ -7,7 +7,13 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, CircleAlert, Loader2, Lock, Mail, User } from "lucide-react";
 import { Logo } from "@/components/brand";
 
-export function AuthForm({ mode }: { mode: "login" | "register" }) {
+export function AuthForm({
+  mode,
+  resetSuccess = false,
+}: {
+  mode: "login" | "register";
+  resetSuccess?: boolean;
+}) {
   const router = useRouter();
   const isRegister = mode === "register";
   const [pending, start] = useTransition();
@@ -105,14 +111,31 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           <input
             type="password"
             required
-            minLength={6}
+            minLength={isRegister ? 8 : undefined}
+            maxLength={72}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder={isRegister ? "Crie uma senha (mín. 6)" : "Sua senha"}
+            placeholder={isRegister ? "Crie uma senha (mín. 8)" : "Sua senha"}
             autoComplete={isRegister ? "new-password" : "current-password"}
             className="w-full bg-transparent text-[14.5px] font-medium text-zinc-100 placeholder:text-zinc-600"
           />
         </label>
+
+        {!isRegister && (
+          <Link
+            href="/esqueci-senha"
+            className="-mt-1 self-end px-1 py-1 text-[12px] font-bold text-volt-400"
+          >
+            Esqueci minha senha
+          </Link>
+        )}
+
+        {resetSuccess && !isRegister && (
+          <p className="flex items-center gap-2 rounded-xl border border-volt-400/25 bg-volt-400/[0.07] px-3.5 py-2.5 text-[12.5px] font-semibold text-volt-300">
+            <Lock className="h-4 w-4 shrink-0" />
+            Senha atualizada. Entre com sua nova senha.
+          </p>
+        )}
 
         <AnimatePresence>
           {error && (

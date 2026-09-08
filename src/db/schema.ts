@@ -33,6 +33,27 @@ export const users = pgTable(
 export type User = typeof users.$inferSelect;
 
 /**
+ * Eventos processados dos gateways de pagamento.
+ * A chave única impede que reenvios de webhook renovem uma assinatura duas vezes.
+ */
+export const billingEvents = pgTable(
+  "billing_events",
+  {
+    id: serial("id").primaryKey(),
+    provider: text("provider").notNull().default("mercado_pago"),
+    eventKey: text("event_key").notNull(),
+    eventType: text("event_type").notNull(),
+    resourceId: text("resource_id").notNull(),
+    userId: integer("user_id"),
+    status: text("status").notNull().default("processed"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("billing_events_provider_key_idx").on(t.provider, t.eventKey)],
+);
+
+export type BillingEvent = typeof billingEvents.$inferSelect;
+
+/**
  * Sessões de login (cookie httpOnly).
  */
 export const sessions = pgTable("sessions", {
@@ -43,6 +64,25 @@ export const sessions = pgTable("sessions", {
 });
 
 export type Session = typeof sessions.$inferSelect;
+
+/**
+ * Tokens de recuperação de senha.
+ * Apenas o hash SHA-256 é salvo: se o banco vazar, o link não pode ser reconstruído.
+ */
+export const passwordResetTokens = pgTable(
+  "password_reset_tokens",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").notNull(),
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("password_reset_token_hash_idx").on(t.tokenHash)],
+);
+
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 
 /**
  * Configurações do veículo e financeiras (uma por usuário).
@@ -165,3 +205,33 @@ export const maintenances = pgTable("maintenances", {
 });
 
 export type Maintenance = typeof maintenances.$inferSelect;
+
+/**
+ * Subscriptions de push notifications (Web Push API).
+ * Um usuário pode ter múltiplos dispositivos/navegadores.
+ */
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  endpoint: text("endpoint").notNull(),
+  auth: text("auth").notNull(), // chave de autenticação
+  p256dh: text("p256dh").notNull(), // chave pública ECDH
+  userAgent: text("user_agent"), // navegador/device
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  lastSentAt: timestamp("last_sent_at", { withTimezone: true }),
+});
+
+export type PushSubscription = typeof pushSubscriptions.$inferSelect;
+
+/**
+ * Log de notificações enviadas (para analytics e retenção).
+ */
+export const notificationLogs = pgTable("notification_logs", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  type: text("type").notNull(), // manutencao_urgente | trial_expira | meta_diaria | outro
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  sentAt: timestamp("sent_at", { withTimezone: true }).defaultNow().notNull(),
+  opened: boolean("opened").notNull().default(false),
+});

@@ -20,7 +20,13 @@ const items = [
   { href: "/metas", label: "Metas", icon: Target },
 ];
 
-const HIDDEN_PREFIXES = ["/entrar", "/criar-conta", "/assinatura"];
+const HIDDEN_PREFIXES = [
+  "/entrar",
+  "/criar-conta",
+  "/esqueci-senha",
+  "/redefinir-senha",
+  "/assinatura",
+];
 
 export function BottomNav() {
   const pathname = usePathname();

@@ -28,7 +28,7 @@ export function BillingClient({
 }: {
   plans: Plan[];
   features: string[];
-  status: "active" | "trialing" | "expired" | "canceled";
+  status: "active" | "trialing" | "pending" | "expired" | "canceled";
   trialDaysLeft: number | null;
   periodEnd: string | null;
   cycle: string | null;
@@ -46,10 +46,15 @@ export function BillingClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cycle: selected }),
       });
-      if (res.ok) {
-        show("Plano ativado — boas rotas!");
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      } else if (res.ok && data.ok) {
+        show("Plano de demonstração ativado");
         router.push("/");
         router.refresh();
+      } else {
+        show(data.error ?? "Não foi possível abrir o checkout");
       }
     });
   };
@@ -57,9 +62,10 @@ export function BillingClient({
   const cancel = () => {
     if (!window.confirm("Cancelar a renovação automática? Você mantém o acesso até o fim do período.")) return;
     start(async () => {
-      await fetch("/api/billing/cancel", { method: "POST" });
-      show("Renovação cancelada");
-      router.refresh();
+      const response = await fetch("/api/billing/cancel", { method: "POST" });
+      const data = await response.json().catch(() => ({}));
+      show(response.ok ? "Renovação cancelada" : (data.error ?? "Falha ao cancelar"));
+      if (response.ok) router.refresh();
     });
   };
 
@@ -99,20 +105,38 @@ export function BillingClient({
               </span>
             </h1>
             <p className="mt-2 text-[13.5px] leading-relaxed text-zinc-400">
-              Garanta o GiroLucro Pro e nunca mais fique sem saber quanto sobra no
-              bolso. Cancele quando quiser.
+              Assine agora e a primeira cobrança será programada para depois do trial.
+            </p>
+          </>
+        ) : status === "pending" ? (
+          <>
+            <h1 className="font-display text-[28px] font-bold leading-tight tracking-tight text-zinc-50">
+              Pagamento em confirmação, {firstName}.
+            </h1>
+            <p className="mt-2 text-[13.5px] leading-relaxed text-zinc-400">
+              Se você ainda não concluiu, continue no checkout. Depois da aprovação, o
+              Mercado Pago libera seu Pro automaticamente.
+            </p>
+          </>
+        ) : status === "canceled" ? (
+          <>
+            <h1 className="font-display text-[28px] font-bold leading-tight tracking-tight text-zinc-50">
+              Renovação cancelada, {firstName}.
+            </h1>
+            <p className="mt-2 text-[13.5px] leading-relaxed text-zinc-400">
+              {periodEnd
+                ? `Seu acesso já pago continua até ${periodEnd}. Você pode reativar quando quiser.`
+                : "Escolha um plano para voltar a usar os recursos Pro."}
             </p>
           </>
         ) : (
           <>
             <h1 className="font-display text-[28px] font-bold leading-tight tracking-tight text-zinc-50">
-              {status === "canceled" ? "Até breve, " : "Seu teste acabou, "}
-              {firstName}.
+              Seu teste acabou, {firstName}.
             </h1>
             <p className="mt-2 text-[13.5px] leading-relaxed text-zinc-400">
-              {status === "canceled"
-                ? "Sua renovação está cancelada. Reative o plano para voltar a registrar e ver seus números."
-                : "Para continuar registrando giros e acompanhando seu lucro real, escolha um plano — custa menos que um litro de gasolina."}
+              Para continuar registrando giros e acompanhando seu lucro real, escolha
+              um plano — custa menos que um litro de gasolina.
             </p>
           </>
         )}
@@ -190,7 +214,13 @@ export function BillingClient({
           className="pressable mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-volt-400 py-4 font-display text-[15.5px] font-bold text-ink-950 disabled:opacity-50"
         >
           {pending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Crown className="h-5 w-5" strokeWidth={2.4} />}
-          {pending ? "Ativando..." : `Ativar GiroLucro Pro · ${brl(plans.find((p) => p.id === selected)?.price ?? 0)}`}
+          {pending
+            ? "Abrindo checkout..."
+            : status === "pending"
+              ? "Continuar pagamento"
+              : status === "canceled"
+                ? `Reativar Pro · ${brl(plans.find((p) => p.id === selected)?.price ?? 0)}`
+                : `Assinar GiroLucro Pro · ${brl(plans.find((p) => p.id === selected)?.price ?? 0)}`}
         </button>
       )}
 

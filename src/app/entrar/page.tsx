@@ -4,8 +4,13 @@ import { getSessionUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-export default async function EntrarPage() {
+export default async function EntrarPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ redefinida?: string }>;
+}) {
   const user = await getSessionUser();
   if (user) redirect("/");
-  return <AuthForm mode="login" />;
+  const params = await searchParams;
+  return <AuthForm mode="login" resetSuccess={params.redefinida === "1"} />;
 }

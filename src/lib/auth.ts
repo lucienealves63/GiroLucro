@@ -72,10 +72,18 @@ export async function requireUser(opts: { needsAccess?: boolean } = {}): Promise
 
 export function hasAccess(user: Pick<User, "planStatus" | "trialEndsAt" | "currentPeriodEnd">): boolean {
   const now = new Date();
-  if (user.planStatus === "active" && user.currentPeriodEnd && user.currentPeriodEnd > now) {
+  if (
+    (user.planStatus === "active" || user.planStatus === "canceled") &&
+    user.currentPeriodEnd &&
+    user.currentPeriodEnd > now
+  ) {
     return true;
   }
-  if (user.planStatus === "trialing" && user.trialEndsAt && user.trialEndsAt > now) {
+  if (
+    (user.planStatus === "trialing" || user.planStatus === "pending_payment") &&
+    user.trialEndsAt &&
+    user.trialEndsAt > now
+  ) {
     return true;
   }
   return false;

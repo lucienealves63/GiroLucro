@@ -50,14 +50,24 @@ Abra http://localhost:3000 → crie sua conta → carregue os **dados de exemplo
 
 ## Deploy (Vercel + Neon)
 
+**Sem instalar nada no computador?** Siga o guia [DEPLOY_ONLINE.md](./DEPLOY_ONLINE.md) —
+GitHub, banco, Vercel e criação das tabelas feitos 100% pelo navegador (até do celular).
+
+Com terminal:
+
 1. Crie um banco gratuito em [neon.tech](https://neon.tech) e copie a `DATABASE_URL`
-2. Importe este repositório na [Vercel](https://vercel.com) → env var `DATABASE_URL` → Deploy
-3. Rode uma vez local: `DATABASE_URL="<url-do-neon>" npx drizzle-kit push`
+2. Importe este repositório na [Vercel](https://vercel.com) → env vars `DATABASE_URL` e `ADMIN_SETUP_TOKEN` → Deploy
+3. Crie as tabelas abrindo um link: `https://SEU-APP.vercel.app/api/admin/setup?token=SEU_TOKEN`
+   (ou, se preferir terminal: `DATABASE_URL="<url>" npx drizzle-kit push`)
 4. Pronto — HTTPS, domínio `.vercel.app` e deploy automático a cada push
 
 ## Pagamentos
 
-A rota `src/app/api/billing/checkout/route.ts` contém o contrato completo do
-ponto de integração (Mercado Pago ou Stripe): criar preferência → webhook confirma →
-ativa o plano. O modelo de cobrança (trial 7 dias → paywall → R$ 19,90/mês ou
-R$ 149,90/ano) já está implementado e testado.
+A integração recorrente do Mercado Pago está em `src/app/api/billing/`: checkout,
+webhook de confirmação e cancelamento. Consulte `MERCADO_PAGO_SETUP.md`.
+
+## Recuperação de senha
+
+O fluxo “Esqueci minha senha” usa tokens com hash, expiração de 30 minutos e envio
+pelo Resend. Configure `RESEND_API_KEY`, `EMAIL_FROM` e `APP_URL` na Vercel seguindo
+`RECUPERACAO_SENHA_SETUP.md`.
