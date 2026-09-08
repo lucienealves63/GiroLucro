@@ -6,6 +6,7 @@ import {
   PASSWORD_RESET_MINUTES,
   createPasswordResetToken,
   getAppUrl,
+  maskEmail,
   sendPasswordResetEmail,
 } from "@/lib/password-reset";
 
@@ -63,6 +64,13 @@ export async function POST(req: Request) {
             .update(passwordResetTokens)
             .set({ usedAt: new Date() })
             .where(eq(passwordResetTokens.id, row.id));
+          console.warn(
+            "[password-reset] Solicitação de",
+            maskEmail(email),
+            "NÃO gerou e-mail (motivo:",
+            delivery.error ?? "desconhecido",
+            ") — token invalidado. Veja /api/admin/email-status?token=SEU_TOKEN para diagnosticar.",
+          );
         }
 
         // Somente desenvolvimento explícito: facilita testar sem enviar e-mail.
@@ -85,7 +93,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, message: GENERIC_MESSAGE });
   } catch (error) {
-    console.error("Forgot password error:", error);
+    // Ex.: tabela password_reset_tokens ainda não criada (rode /api/admin/setup?token=...).
+    console.error("[password-reset] Falha inesperada (verifique se o setup do banco foi executado):", error);
     // Resposta genérica também em falhas: não expõe cadastro nem infraestrutura.
     return NextResponse.json({ ok: true, message: GENERIC_MESSAGE });
   }

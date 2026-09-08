@@ -68,6 +68,39 @@ dados existentes não serão apagados.
 6. Salve uma senha com pelo menos 8 caracteres
 7. Entre novamente com a nova senha
 
+## O e-mail não chegou? Diagnóstico em 1 minuto
+
+Abra no navegador (troque pelo seu domínio e token):
+
+```text
+https://SEU-DOMINIO/api/admin/email-status?token=SEU_ADMIN_SETUP_TOKEN
+```
+
+Essa página testa tudo sozinha e diz exatamente o que falta. As causas mais
+comuns, em ordem:
+
+| # | Causa | Como resolver |
+|---|-------|---------------|
+| 1 | `RESEND_API_KEY` ou `EMAIL_FROM` não configuradas na Vercel | Settings → Environment Variables → criar as duas (Production + Preview + Development) → Deployments → Redeploy |
+| 2 | Tabela `password_reset_tokens` não existe (deploy feito antes da recuperação de senha) | Abra `/api/admin/setup?token=SEU_TOKEN` — ela cria só o que falta, sem apagar nada |
+| 3 | Domínio não verificado no Resend | resend.com → Domains → completar os registros DNS até ficar **Verified** |
+| 4 | `EMAIL_FROM` com `onboarding@resend.dev` | Em modo de teste o Resend só entrega para o e-mail dono da conta — usuários reais não recebem. Verifique seu domínio (causa 3) e troque o remetente |
+| 5 | Chave do Resend inválida/excluída | Gere outra em resend.com → API Keys e atualize na Vercel |
+| 6 | E-mail caiu no Spam | Confira Spam, Lixo eletrônico e a aba Promoções; o teste abaixo confirma se o problema é entrega ou caixa do usuário |
+
+Depois do diagnóstico, confirme a entrega de ponta a ponta:
+
+```text
+https://SEU-DOMINIO/api/admin/test-email?token=SEU_TOKEN&to=voce@email.com
+```
+
+Se o teste chegar, o serviço está OK — o problema está no endereço do usuário
+(digitou errado, caixa cheia ou filtro anti-spam).
+
+> Por segurança, a tela “Esqueci minha senha” sempre mostra a mesma mensagem,
+> mesmo quando o e-mail não pôde ser enviado. O motivo real fica nos logs da
+> Vercel (filtre por `password-reset`) e na página de diagnóstico acima.
+
 ## Entregabilidade
 
 Para os e-mails não caírem em Spam:
