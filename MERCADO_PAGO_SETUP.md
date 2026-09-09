@@ -117,6 +117,40 @@ Quando o teste estiver aprovado:
 3. faça uma compra real de baixo risco com uma conta compradora diferente;
 4. valide cobrança, cancelamento e acesso até o fim do período.
 
+## 9. Pix à vista
+
+Além da assinatura (renovação automática), o GiroLucro também aceita **Pix à vista
+(pagamento único)** na tela de assinatura.
+
+- O botão **“Pagar com Pix”** gera um QR Code válido por 30 minutos.
+- O QR usa o mesmo `MERCADO_PAGO_ACCESS_TOKEN` — não precisa de variável extra.
+- O webhook confirma o pagamento `approved`, confere o valor e a moeda `BRL` e ativa
+  o Pro por 30 (mensal) ou 365 (anual) dias.
+- É um **pagamento único**: não renova sozinho. Ao terminar o período, o usuário
+  precisa pagar de novo para continuar com o Pro.
+
+No webhook do Mercado Pago, mantenha o tópico **Pagamentos** (`payment`) ativo. Esse
+tópico é o mesmo usado pelo ramo Pix e pelo fluxo antigo de assinatura.
+
+## 10. Diagnóstico do pagamento
+
+Abra no navegador:
+
+```text
+https://SEU-DOMINIO/api/admin/billing-status?token=SEU_ADMIN_SETUP_TOKEN
+```
+
+A página (visual idêntico ao diagnóstico de e-mail) verifica:
+
+1. `MERCADO_PAGO_ACCESS_TOKEN` está presente e se usa `APP_USR-` (produção),
+   `TEST-` (só teste) ou outro formato (ex.: Public Key).
+2. O Access Token é aceito pelo Mercado Pago (`GET /users/me`).
+3. `MERCADO_PAGO_WEBHOOK_SECRET` está presente.
+4. `APP_URL` resolvida e sua origem.
+5. A tabela `billing_events` existe no banco.
+
+Para JSON, adicione `&format=json` ao final da URL.
+
 ## Variáveis finais
 
 ```env

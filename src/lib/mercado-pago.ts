@@ -54,14 +54,35 @@ export interface MercadoPagoPayment {
   date_created?: string;
 }
 
+export interface MercadoPagoPixPayment {
+  id: number | string;
+  status?: string;
+  status_detail?: string;
+  transaction_amount?: number;
+  currency_id?: string;
+  date_of_expiration?: string;
+  external_reference?: string;
+  point_of_interaction?: {
+    transaction_data?: {
+      qr_code?: string;
+      qr_code_base64?: string;
+      ticket_url?: string;
+    };
+  };
+}
+
+/** Validade do QR Code Pix gerado à vista. */
+export const PIX_QR_MINUTES = 30;
+
 async function mpFetch<T>(
   endpoint: string,
   options: { method?: "GET" | "POST" | "PUT"; body?: unknown } = {},
 ): Promise<T> {
   if (!accessToken) throw new Error("Mercado Pago não configurado");
 
+  const method = options.method ?? "GET";
   const response = await fetch(`${API_BASE}${endpoint}`, {
-    method: options.method ?? "GET",
+    method,
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
@@ -73,9 +94,23 @@ async function mpFetch<T>(
 
   const data = (await response.json().catch(() => null)) as T | null;
   if (!response.ok || !data) {
-    console.error("Mercado Pago API error", response.status, data);
+    const detail =
+      data &&
+      typeof data === "object" &&
+      "message" in data
+        ? String((data as { message?: unknown }).message)
+        : data
+          ? JSON.stringify(data).slice(0, 300)
+          : response.statusText || "sem resposta";
+    console.error(`[billing] ${method} ${endpoint} => ${response.status} ${detail}`);
     throw new Error(`Mercado Pago respondeu ${response.status}`);
   }
+
+  const detail =
+    data && typeof data === "object" && "id" in data
+      ? `id=${String((data as { id?: unknown }).id ?? "")}`
+      : "ok";
+  console.info(`[billing] ${method} ${endpoint} => ${response.status} ${detail}`);
   return data;
 }
 
@@ -143,6 +178,58 @@ export function getAuthorizedPayment(
 
 export function getPayment(id: string): Promise<MercadoPagoPayment> {
   return mpFetch(`/v1/payments/${encodeURIComponent(id)}`);
+}
+
+export function getPixPayment(id: string): Promise<MercadoPagoPixPayment> {
+  return mpFetch(`/v1/payments/${encodeURIComponent(id)}`);
+}
+
+/** Gera um Pix à vista (pagamento único) e retorna o QR Code. */
+export async function createPixCharge({
+  userId,
+  userEmail,
+  cycle,
+  priceInCents,
+}: {
+  userId: number;
+  userEmail: string;
+  cycle: "monthly" | "yearly";
+  priceInCents: number;
+}) {
+  if (!accessToken) throw new Error("billing_not_configured");
+
+  const appUrl = getAppUrl();
+  const expiresAt = new Date(Date.now() + PIX_QR_MINUTES * 60_000);
+
+  const payment = await mpFetch<MercadoPagoPixPayment>("/v1/payments", {
+    method: "POST",
+    body: {
+      transaction_amount: priceInCents / 100,
+      payment_method_id: "pix",
+      payer: { email: userEmail },
+      external_reference: `girolucro:${userId}:${cycle}`,
+      notification_url: `${appUrl}/api/billing/webhook`,
+      date_of_expiration: expiresAt.toISOString(),
+    },
+  });
+
+  const transaction = payment.point_of_interaction?.transaction_data;
+  const qrCode = transaction?.qr_code ?? "";
+  const qrCodeBase64 = transaction?.qr_code_base64 ?? "";
+  const ticketUrl = transaction?.ticket_url ?? "";
+
+  if (!payment.id || (!qrCode && !qrCodeBase64)) {
+    throw new Error("Mercado Pago não retornou o QR Code");
+  }
+
+  return {
+    paymentId: String(payment.id),
+    status: payment.status ?? "pending",
+    qrCode,
+    qrCodeBase64,
+    ticketUrl,
+    expiresAt,
+  };
 }
 
 export async function cancelSubscription(subscriptionId: string) {

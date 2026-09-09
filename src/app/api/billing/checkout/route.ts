@@ -85,7 +85,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, checkoutUrl: result.checkoutUrl });
   } catch (error) {
-    console.error("Checkout error:", error);
+    console.error("[billing] Falha ao criar checkout de assinatura:", error);
     return NextResponse.json(
       { error: "Não foi possível abrir o checkout. Tente novamente." },
       { status: 502 },
