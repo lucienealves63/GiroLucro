@@ -71,6 +71,7 @@ Quando quiser mudar o app:
 
 - Mude `ADMIN_SETUP_TOKEN` para algo só seu (sem isso, qualquer pessoa pode
   executar o setup — embora ele não apague nada, só criar tabelas)
-- Enquanto pagamentos estiverem sem `MERCADO_PAGO_ACCESS_TOKEN`, qualquer usuário
-  que clicar "Ativar Pro" ativa grátis (modo demo). Configure o token do MP antes
-  de abrir as vendas de verdade
+- Enquanto pagamentos estiverem sem `MERCADO_PAGO_ACCESS_TOKEN`, o checkout em
+  produção retorna **erro 503** (billing não configurado) — ele **não** ativa o
+  plano demo grátis no deploy online. Configure o token do MP antes de abrir as
+  vendas de verdade.

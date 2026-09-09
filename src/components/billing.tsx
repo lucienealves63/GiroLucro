@@ -1,21 +1,37 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { motion } from "framer-motion";
 import {
   BadgeCheck,
   Check,
+  Copy,
   Crown,
   Loader2,
+  QrCode,
   ShieldCheck,
   Sparkles,
+  Timer,
 } from "lucide-react";
 import clsx from "clsx";
 import type { Plan } from "@/lib/billing";
 import { brl } from "@/lib/format";
 import { Logo } from "@/components/brand";
 import { Toast, useToast } from "@/components/ui";
+
+type PixResponse = {
+  ok?: boolean;
+  reused?: boolean;
+  paymentId?: string;
+  status?: string;
+  qrCode?: string;
+  qrCodeBase64?: string;
+  ticketUrl?: string;
+  expiresAt?: string;
+  error?: string;
+};
 
 export function BillingClient({
   plans,
@@ -38,6 +54,15 @@ export function BillingClient({
   const [pending, start] = useTransition();
   const [selected, setSelected] = useState<string>("yearly");
   const { msg, show } = useToast();
+  const showRef = useRef(show);
+  useEffect(() => {
+    showRef.current = show;
+  }, [show]);
+
+  const [pix, setPix] = useState<PixResponse | null>(null);
+  const [pixPending, setPixPending] = useState(false);
+  const [pixRemaining, setPixRemaining] = useState(0);
+  const [checkingPix, setCheckingPix] = useState(false);
 
   const activate = () => {
     start(async () => {
@@ -59,6 +84,30 @@ export function BillingClient({
     });
   };
 
+  const activatePix = () => {
+    setPixPending(true);
+    setPix(null);
+    void (async () => {
+      try {
+        const res = await fetch("/api/billing/checkout-pix", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cycle: selected }),
+        });
+        const data = (await res.json()) as PixResponse;
+        if (res.ok && data.ok && (data.qrCode || data.qrCodeBase64) && data.expiresAt) {
+          setPix(data);
+        } else {
+          show(data.error ?? "Não foi possível gerar o Pix. Tente novamente.");
+        }
+      } catch {
+        show("Não foi possível gerar o Pix. Tente novamente.");
+      } finally {
+        setPixPending(false);
+      }
+    })();
+  };
+
   const cancel = () => {
     if (!window.confirm("Cancelar a renovação automática? Você mantém o acesso até o fim do período.")) return;
     start(async () => {
@@ -68,6 +117,100 @@ export function BillingClient({
       if (response.ok) router.refresh();
     });
   };
+
+  const copyQrCode = async () => {
+    const code = pix?.qrCode;
+    if (!code) return;
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(code);
+        show("Código copiado");
+        return;
+      } catch {
+        // tenta o fallback abaixo
+      }
+    }
+    try {
+      const textarea = document.createElement("textarea");
+      textarea.value = code;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+      show("Código copiado");
+    } catch {
+      show("Copie manualmente o código abaixo.");
+    }
+  };
+
+  const checkPix = async () => {
+    setCheckingPix(true);
+    try {
+      const res = await fetch("/api/billing/status");
+      const data = (await res.json().catch(() => ({}))) as { planStatus?: string };
+      if (res.ok && data.planStatus === "active") {
+        setPix(null);
+        router.push("/");
+        router.refresh();
+        return;
+      }
+      show("Ainda não confirmamos o pagamento. Você pode verificar de novo.");
+    } catch {
+      show("Não foi possível verificar agora. Tente novamente.");
+    } finally {
+      setCheckingPix(false);
+    }
+  };
+
+  const cancelPix = () => {
+    setPix(null);
+    setPixRemaining(0);
+  };
+
+  // Polling do status: ao confirmar, volta para o app.
+  useEffect(() => {
+    if (!pix) return;
+    const timer = setInterval(async () => {
+      try {
+        const res = await fetch("/api/billing/status");
+        const data = (await res.json().catch(() => ({}))) as { planStatus?: string };
+        if (res.ok && data.planStatus === "active") {
+          setPix(null);
+          router.push("/");
+          router.refresh();
+        }
+      } catch {
+        // rede momentânea: o próximo tick tenta de novo
+      }
+    }, 8_000);
+    return () => clearInterval(timer);
+  }, [pix, router]);
+
+  // Regressivo do QR Code.
+  useEffect(() => {
+    const expiresAt = pix?.expiresAt;
+    if (!expiresAt) return;
+    const tick = () => {
+      const ms = new Date(expiresAt).getTime() - Date.now();
+      if (ms <= 0) {
+        setPix(null);
+        setPixRemaining(0);
+        showRef.current("O QR Code expirou. Gere um novo Pix para continuar.");
+      } else {
+        setPixRemaining(Math.ceil(ms / 1000));
+      }
+    };
+    tick();
+    const timer = setInterval(tick, 1_000);
+    return () => clearInterval(timer);
+  }, [pix?.expiresAt]);
+
+  const pixMinutes = Math.floor(pixRemaining / 60);
+  const pixSeconds = pixRemaining % 60;
+  const pixCountdown = `${String(pixMinutes).padStart(2, "0")}:${String(pixSeconds).padStart(2, "0")}`;
 
   return (
     <div className="px-5 pb-10">
@@ -208,30 +351,113 @@ export function BillingClient({
       </motion.div>
 
       {status !== "active" && (
-        <button
-          onClick={activate}
-          disabled={pending}
-          className="pressable mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-volt-400 py-4 font-display text-[15.5px] font-bold text-ink-950 disabled:opacity-50"
+        <>
+          <button
+            onClick={activate}
+            disabled={pending || pixPending}
+            className="pressable mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-volt-400 py-4 font-display text-[15.5px] font-bold text-ink-950 disabled:opacity-50"
+          >
+            {pending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Crown className="h-5 w-5" strokeWidth={2.4} />}
+            {pending
+              ? "Abrindo checkout..."
+              : status === "pending"
+                ? "Continuar pagamento"
+                : status === "canceled"
+                  ? `Reativar Pro · ${brl(plans.find((p) => p.id === selected)?.price ?? 0)}`
+                  : `Assinar GiroLucro Pro · ${brl(plans.find((p) => p.id === selected)?.price ?? 0)}`}
+          </button>
+
+          {!pix && (
+            <button
+              onClick={activatePix}
+              disabled={pixPending || pending}
+              className="pressable mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-volt-400/35 bg-volt-400/[0.07] py-4 font-display text-[15.5px] font-bold text-volt-300 disabled:opacity-50"
+            >
+              {pixPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <QrCode className="h-5 w-5" strokeWidth={2.4} />}
+              {pixPending
+                ? "Gerando Pix..."
+                : `Pagar com Pix · ${brl(plans.find((p) => p.id === selected)?.price ?? 0)}`}
+            </button>
+          )}
+        </>
+      )}
+
+      {pix && (
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-4 rounded-3xl border border-volt-400/30 bg-white/[0.025] p-5"
         >
-          {pending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Crown className="h-5 w-5" strokeWidth={2.4} />}
-          {pending
-            ? "Abrindo checkout..."
-            : status === "pending"
-              ? "Continuar pagamento"
-              : status === "canceled"
-                ? `Reativar Pro · ${brl(plans.find((p) => p.id === selected)?.price ?? 0)}`
-                : `Assinar GiroLucro Pro · ${brl(plans.find((p) => p.id === selected)?.price ?? 0)}`}
-        </button>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-zinc-400">
+              <QrCode className="h-4 w-4 text-volt-400" /> Pague com Pix
+            </p>
+            <span className="flex items-center gap-1.5 rounded-full bg-white/[0.06] px-2.5 py-1 text-[11px] font-bold tabular text-volt-300">
+              <Timer className="h-3.5 w-3.5" /> {pixCountdown}
+            </span>
+          </div>
+
+          <div className="mx-auto aspect-square w-full max-w-[230px] overflow-hidden rounded-2xl border border-white/10 bg-white p-2">
+            {pix.qrCodeBase64 ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={`data:image/png;base64,${pix.qrCodeBase64}`}
+                alt="QR Code do Pix"
+                className="h-full w-full object-contain"
+              />
+            ) : (
+              <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-4 text-center">
+                <QrCode className="h-10 w-10 text-ink-900" />
+                <p className="text-[11px] font-semibold text-ink-900">
+                  Use a opção copiar código para colar no app do banco.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <p className="mt-3 text-center text-[12px] text-zinc-400">
+            Escaneie o QR Code no app do seu banco e confirme o pagamento.{" "}
+            <span className="font-semibold text-zinc-200">Pagamento único</span>, sem
+            renovação automática.
+          </p>
+
+          {pix.qrCode && (
+            <button
+              onClick={copyQrCode}
+              className="pressable mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-white/[0.12] bg-white/[0.04] py-3 text-[13px] font-bold text-zinc-300"
+            >
+              <Copy className="h-4 w-4" /> Copiar código Pix
+            </button>
+          )}
+
+          <div className="mt-3 flex flex-col gap-2.5">
+            <button
+              onClick={checkPix}
+              disabled={checkingPix}
+              className="pressable flex w-full items-center justify-center gap-2 rounded-2xl bg-volt-400 py-3 font-display text-[14px] font-bold text-ink-950 disabled:opacity-50"
+            >
+              {checkingPix ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" strokeWidth={2.6} />}
+              {checkingPix ? "Verificando..." : "Já paguei, verificar"}
+            </button>
+            <button
+              onClick={cancelPix}
+              disabled={checkingPix}
+              className="pressable mx-auto text-[12px] font-semibold text-zinc-500 underline-offset-4 hover:underline disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+          </div>
+        </motion.div>
       )}
 
       {status === "active" && (
         <div className="mt-5 flex flex-col gap-3">
-          <a
+          <Link
             href="/"
             className="pressable flex w-full items-center justify-center rounded-2xl bg-volt-400 py-4 font-display text-[15.5px] font-bold text-ink-950"
           >
             Voltar ao app
-          </a>
+          </Link>
           <button
             onClick={cancel}
             disabled={pending}

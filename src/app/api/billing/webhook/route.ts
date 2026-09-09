@@ -154,13 +154,63 @@ export async function POST(req: Request) {
         .from(users)
         .where(eq(users.id, reference.userId))
         .limit(1);
-      if (!referencedUser?.billingCustomerId) {
+      const referencedPlan = PLANS.find((item) => item.id === reference.cycle);
+      if (!referencedUser || !referencedPlan) {
         await db
           .update(billingEvents)
           .set({ status: "rejected" })
           .where(eq(billingEvents.id, claimed.id));
         return NextResponse.json({ ok: true, rejected: true });
       }
+
+      // Pix à vista: pagamento único identificado por billingCustomerId = pix:{id}.
+      if (referencedUser.billingCustomerId === `pix:${String(payment.id)}`) {
+        const pixAmount = Number(payment.transaction_amount);
+        const validAmount =
+          Number.isFinite(pixAmount) && Math.abs(pixAmount - referencedPlan.price) < 0.011;
+        const validCurrency = String(payment.currency_id ?? "").toUpperCase() === "BRL";
+        const pixApproved = payment.status === "approved";
+
+        if (pixApproved && validAmount && validCurrency) {
+          const currentPeriodEnd = new Date(
+            Date.now() + referencedPlan.days * 86400000,
+          );
+          await db.transaction(async (tx) => {
+            await tx
+              .update(users)
+              .set({
+                planStatus: "active",
+                planCycle: referencedPlan.id,
+                currentPeriodEnd,
+              })
+              .where(eq(users.id, referencedUser.id));
+            await tx
+              .update(billingEvents)
+              .set({ userId: referencedUser.id, status: "processed" })
+              .where(eq(billingEvents.id, claimed.id));
+          });
+          return NextResponse.json({ ok: true, activated: true });
+        }
+
+        const pixStatus =
+          !pixApproved && payment.status !== "rejected" ? "observed" : "rejected";
+        await db
+          .update(billingEvents)
+          .set({ userId: referencedUser.id, status: pixStatus })
+          .where(eq(billingEvents.id, claimed.id));
+        return NextResponse.json({ ok: true, activated: false });
+      }
+
+      // Ramo antigo (assinatura): rejeita sem lançar quando não há
+      // billingCustomerId ou quando o pagamento é um Pix à vista.
+      if (!referencedUser.billingCustomerId || referencedUser.billingCustomerId.startsWith("pix:")) {
+        await db
+          .update(billingEvents)
+          .set({ status: "rejected" })
+          .where(eq(billingEvents.id, claimed.id));
+        return NextResponse.json({ ok: true, rejected: true });
+      }
+
       subscription = await getSubscription(referencedUser.billingCustomerId);
       paymentApproved = payment.status === "approved";
       chargeDate = payment.date_approved ?? payment.date_created;
