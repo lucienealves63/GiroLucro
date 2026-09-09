@@ -122,7 +122,8 @@ Quando o teste estiver aprovado:
 Além da assinatura (renovação automática), o GiroLucro também aceita **Pix à vista
 (pagamento único)** na tela de assinatura.
 
-- O botão **“Pagar com Pix”** gera um QR Code válido por 30 minutos.
+- O botão **“Pagar com Pix”** gera um QR Code válido por 60 minutos (o Mercado Pago
+  exige validade entre 30 minutos e 30 dias).
 - O QR usa o mesmo `MERCADO_PAGO_ACCESS_TOKEN` — não precisa de variável extra.
 - O webhook confirma o pagamento `approved`, confere o valor e a moeda `BRL` e ativa
   o Pro por 30 (mensal) ou 365 (anual) dias.

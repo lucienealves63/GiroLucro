@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { getAppUrl } from "@/lib/password-reset";
 
 const API_BASE = "https://api.mercadopago.com";
@@ -71,12 +71,20 @@ export interface MercadoPagoPixPayment {
   };
 }
 
-/** Validade do QR Code Pix gerado à vista. */
-export const PIX_QR_MINUTES = 30;
+/**
+ * Validade do QR Code Pix gerado à vista.
+ * O Mercado Pago aceita `date_of_expiration` entre 30 minutos e 30 dias.
+ */
+export const PIX_QR_MINUTES = 60;
 
 async function mpFetch<T>(
   endpoint: string,
-  options: { method?: "GET" | "POST" | "PUT"; body?: unknown } = {},
+  options: {
+    method?: "GET" | "POST" | "PUT";
+    body?: unknown;
+    /** Headers extras mesclados aos padrões (ex.: X-Idempotency-Key). */
+    headers?: Record<string, string>;
+  } = {},
 ): Promise<T> {
   if (!accessToken) throw new Error("Mercado Pago não configurado");
 
@@ -86,6 +94,7 @@ async function mpFetch<T>(
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
+      ...options.headers,
     },
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
     cache: "no-store",
@@ -203,6 +212,9 @@ export async function createPixCharge({
 
   const payment = await mpFetch<MercadoPagoPixPayment>("/v1/payments", {
     method: "POST",
+    // Obrigatório no POST /v1/payments; sem ele o MP responde 400
+    // "Header X-Idempotency-Key can't be null". Uma chave nova por tentativa.
+    headers: { "X-Idempotency-Key": randomUUID() },
     body: {
       transaction_amount: priceInCents / 100,
       payment_method_id: "pix",
