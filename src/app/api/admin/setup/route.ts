@@ -167,6 +167,10 @@ const STATEMENTS: { name: string; sql: string }[] = [
     name: "settings_user_idx",
     sql: `CREATE UNIQUE INDEX IF NOT EXISTS "settings_user_idx" ON "settings" USING btree ("user_id")`,
   },
+  {
+    name: "settings_platforms_json",
+    sql: `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "platforms_json" text`,
+  },
 ];
 
 function page(title: string, rows: string, ok: boolean): string {

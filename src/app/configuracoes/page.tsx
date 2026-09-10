@@ -2,6 +2,7 @@ import { SettingsClient } from "@/components/settings";
 import { hasAccess, requireUser, trialDaysLeft } from "@/lib/auth";
 import { getAppData } from "@/lib/data";
 import { costPerKm, dailyFixedShare, monthlyFixed } from "@/lib/calculations";
+import { parsePlatformsJson } from "@/lib/platforms";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,7 @@ export default async function ConfiguracoesPage() {
   const user = await requireUser();
   const data = await getAppData(user.id);
   const s = data.settings;
+  const platforms = parsePlatformsJson(s.platformsJson);
 
   const trial = trialDaysLeft(user);
   let planLabel = "Teste grátis";
@@ -61,6 +63,7 @@ export default async function ConfiguracoesPage() {
       monthlyFixed={monthlyFixed(s)}
       dailyFixed={dailyFixedShare(s)}
       hasData={data.entries.length > 0}
+      platforms={platforms}
     />
   );
 }

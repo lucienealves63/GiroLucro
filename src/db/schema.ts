@@ -138,6 +138,8 @@ export const settings = pgTable(
   })
     .notNull()
     .default(0),
+  /** JSON das plataformas de ganho (built-in + custom). null = padrão. */
+  platformsJson: text("platforms_json"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [uniqueIndex("settings_user_idx").on(t.userId)],

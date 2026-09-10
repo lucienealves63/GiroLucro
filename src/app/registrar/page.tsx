@@ -4,13 +4,17 @@ import { computeRange, costPerKm } from "@/lib/calculations";
 import { getAppData } from "@/lib/data";
 import {
   EXPENSE_META,
-  PLATFORM_META,
   hrs,
   km as fmtKm,
   lastNDays,
   timeAgo,
   todayStr,
 } from "@/lib/format";
+import {
+  enabledPlatforms,
+  parsePlatformsJson,
+  resolvePlatformMeta,
+} from "@/lib/platforms";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +23,8 @@ export default async function RegistrarPage() {
   const data = await getAppData(user.id);
   const today = todayStr();
   const s = data.settings;
+  const allPlatforms = parsePlatformsJson(s.platformsJson);
+  const platforms = enabledPlatforms(allPlatforms);
 
   const range14 = computeRange(lastNDays(today, 14), data.entries, data.expenses, s);
 
@@ -26,12 +32,12 @@ export default async function RegistrarPage() {
     ...data.entries
       .filter((e) => e.date === today)
       .map((e) => {
-        const meta = PLATFORM_META[e.platform];
-        const unit = meta?.unit ?? "corrida";
+        const meta = resolvePlatformMeta(e.platform, allPlatforms);
+        const unit = meta.unit;
         return {
           id: e.id,
           kind: "entry" as const,
-          label: meta?.label ? `${meta.label}${e.quantity > 1 ? ` · ${e.quantity} ${unit}s` : ""}` : "Giro",
+          label: `${meta.label}${e.quantity > 1 ? ` · ${e.quantity} ${unit}s` : ""}`,
           sub: `${hrs(e.hours)} · ${fmtKm(e.km)}${e.waitMinutes > 0 ? ` · ${Math.round(e.waitMinutes)}min espera` : ""}${!e.settled ? " · a receber" : ""}`,
           amount: e.gross,
           positive: true,
@@ -73,6 +79,7 @@ export default async function RegistrarPage() {
       items={items}
       grossToday={grossToday}
       hasBaselines={range14.hours >= 3}
+      platforms={platforms}
     />
   );
 }

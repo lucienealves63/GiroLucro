@@ -48,6 +48,32 @@ const PLATFORM_ALIASES: Record<string, string> = {
   outros: "outro",
 };
 
+function normalize(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s.,]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Aliases extras gerados a partir dos apps do usuário (custom). */
+export function buildPlatformAliases(
+  platforms?: { id: string; label: string }[] | null,
+): Record<string, string> {
+  const map = { ...PLATFORM_ALIASES };
+  if (!platforms) return map;
+  for (const p of platforms) {
+    if (!p?.id || !p?.label) continue;
+    const norm = normalize(p.label);
+    if (norm.length >= 2) map[norm] = p.id;
+    const idNorm = normalize(p.id.replace(/^custom_/, "").replace(/_/g, " "));
+    if (idNorm.length >= 2) map[idNorm] = p.id;
+  }
+  return map;
+}
+
 const TAB_ALIASES: Record<string, VoiceTab> = {
   ganho: "ganho",
   giro: "ganho",
@@ -95,16 +121,6 @@ const PERIOD_ALIASES: Record<string, string> = {
   noite: "noite",
   madrugada: "madrugada",
 };
-
-function normalize(text: string): string {
-  return text
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9\s.,]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
 
 function parseNumberToken(raw: string): number | null {
   const cleaned = raw
@@ -171,13 +187,18 @@ function firstLooseNumber(text: string): number | null {
   return parseNumberToken(m[1]);
 }
 
-function detectPlatform(text: string): string | undefined {
+function detectPlatform(
+  text: string,
+  extraAliases?: Record<string, string>,
+): string | undefined {
+  const aliases = extraAliases ?? PLATFORM_ALIASES;
   // Ordena aliases longos primeiro para "noventa e nove" etc.
-  const entries = Object.entries(PLATFORM_ALIASES).sort(
+  const entries = Object.entries(aliases).sort(
     (a, b) => b[0].length - a[0].length,
   );
   for (const [alias, id] of entries) {
-    const re = new RegExp(`(?:^|\\s)${alias}(?:\\s|$)`, "i");
+    const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`(?:^|\\s)${escaped}(?:\\s|$)`, "i");
     if (re.test(text)) return id;
   }
   return undefined;
@@ -234,12 +255,16 @@ function formatSummary(result: Omit<VoiceCommandResult, "raw" | "summary">): str
   return bits.length > 0 ? bits.join(" · ") : "comando reconhecido";
 }
 
-export function parseVoiceCommand(transcript: string): VoiceCommandResult {
+export function parseVoiceCommand(
+  transcript: string,
+  userPlatforms?: { id: string; label: string }[] | null,
+): VoiceCommandResult {
   const raw = transcript.trim();
   const text = normalize(raw);
 
+  const aliases = buildPlatformAliases(userPlatforms);
   const action = detectAction(text);
-  const platform = detectPlatform(text);
+  const platform = detectPlatform(text, aliases);
   let tab = detectTab(text);
   const period = detectPeriod(text);
 

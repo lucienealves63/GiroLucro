@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth";
 import { buildInsights, computeRange, platformBreakdown } from "@/lib/calculations";
 import { getAppData } from "@/lib/data";
 import { lastNDays, todayStr } from "@/lib/format";
+import { parsePlatformsJson } from "@/lib/platforms";
 
 export const dynamic = "force-dynamic";
 
@@ -81,6 +82,7 @@ export default async function CompararPage() {
       settlements={settlements}
       totalPending={totalPending}
       hasData={data.entries.length > 0}
+      platforms={parsePlatformsJson(data.settings.platformsJson)}
     />
   );
 }

@@ -20,8 +20,11 @@ import {
   Zap,
 } from "lucide-react";
 import clsx from "clsx";
+import Link from "next/link";
 import { rideVerdict } from "@/lib/calculations";
-import { PLATFORM_META, PLATFORM_KEYS, brl, brlSign, parseBR } from "@/lib/format";
+import { brl, brlSign, parseBR } from "@/lib/format";
+import type { PlatformMeta } from "@/lib/platforms";
+import { resolvePlatformMeta } from "@/lib/platforms";
 import { Field, MoneyInput, SectionTitle, Toast, useToast } from "@/components/ui";
 import { VoiceButton } from "@/components/voice-button";
 import {
@@ -94,6 +97,7 @@ export function RegisterClient({
   items,
   grossToday,
   hasBaselines,
+  platforms,
 }: {
   today: string;
   avgPerKm: number;
@@ -103,14 +107,22 @@ export function RegisterClient({
   items: RegisterItem[];
   grossToday: number;
   hasBaselines: boolean;
+  platforms: PlatformMeta[];
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("ganho");
   const [pending, start] = useTransition();
   const { msg, show } = useToast();
 
+  const activePlatforms = useMemo(
+    () => platforms.filter((p) => p.enabled !== false),
+    [platforms],
+  );
+
   // form ganho
-  const [platform, setPlatform] = useState<string>("ifood");
+  const [platform, setPlatform] = useState<string>(
+    () => activePlatforms[0]?.id ?? "ifood",
+  );
   const [period, setPeriod] = useState<string>(periodNow());
   const [gross, setGross] = useState("");
   const [hours, setHours] = useState("");
@@ -133,8 +145,9 @@ export function RegisterClient({
   const [voiceHint, setVoiceHint] = useState<string | null>(null);
   const [voiceInterim, setVoiceInterim] = useState<string | null>(null);
 
-  const cat = PLATFORM_META[platform]?.category ?? "ride";
-  const unit = PLATFORM_META[platform]?.unit ?? "corrida";
+  const platformMeta = resolvePlatformMeta(platform, platforms);
+  const cat = platformMeta.category;
+  const unit = platformMeta.unit;
   const isDelivery = cat === "delivery";
 
   const verdict = useMemo(() => {
@@ -147,7 +160,8 @@ export function RegisterClient({
   const pickPlatform = (p: string) => {
     setPlatform(p);
     // direto/B2B costuma pagar na hora
-    setSettled(p === "direto");
+    const meta = resolvePlatformMeta(p, platforms);
+    setSettled(p === "direto" || meta.label.toLowerCase().includes("direto"));
   };
 
   const saveEntry = useCallback(() => {
@@ -171,8 +185,9 @@ export function RegisterClient({
       });
       if (res.ok) {
         const qty = Math.max(1, Math.round(parseBR(quantity) || 1));
-        const delivery = (PLATFORM_META[platform]?.category ?? "ride") === "delivery";
-        const u = PLATFORM_META[platform]?.unit ?? "corrida";
+        const meta = resolvePlatformMeta(platform, platforms);
+        const delivery = meta.category === "delivery";
+        const u = meta.unit;
         show(
           delivery
             ? `Bateria salva: + ${brl(g)} (${qty} ${u}s)`
@@ -183,7 +198,7 @@ export function RegisterClient({
         router.refresh();
       }
     });
-  }, [gross, today, platform, period, hours, tripKm, quantity, waitMin, settled, router, show, start]);
+  }, [gross, today, platform, period, hours, tripKm, quantity, waitMin, settled, platforms, router, show, start]);
 
   const saveExpense = useCallback(() => {
     const a = parseBR(expAmount);
@@ -235,7 +250,13 @@ export function RegisterClient({
       if (cmd.tab) setTab(cmd.tab);
       if (cmd.platform) {
         setPlatform(cmd.platform);
-        if (cmd.settled === undefined) setSettled(cmd.platform === "direto");
+        if (cmd.settled === undefined) {
+          const m = resolvePlatformMeta(cmd.platform, platforms);
+          setSettled(
+            cmd.platform === "direto" ||
+              m.label.toLowerCase().includes("direto"),
+          );
+        }
       }
       if (cmd.period) setPeriod(cmd.period);
       if (cmd.settled !== undefined) setSettled(cmd.settled);
@@ -279,7 +300,12 @@ export function RegisterClient({
             const k = cmd.km ?? parseBR(tripKm);
             const q = cmd.quantity ?? Math.max(1, Math.round(parseBR(quantity) || 1));
             const w = cmd.waitMinutes ?? parseBR(waitMin);
-            const s = cmd.settled ?? (p === "direto" ? true : settled);
+            const metaP = resolvePlatformMeta(p, platforms);
+            const s =
+              cmd.settled ??
+              (p === "direto" || metaP.label.toLowerCase().includes("direto")
+                ? true
+                : settled);
             const res = await fetch("/api/entries", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -296,8 +322,8 @@ export function RegisterClient({
               }),
             });
             if (res.ok) {
-              const delivery = (PLATFORM_META[p]?.category ?? "ride") === "delivery";
-              const u = PLATFORM_META[p]?.unit ?? "corrida";
+              const delivery = metaP.category === "delivery";
+              const u = metaP.unit;
               show(
                 delivery
                   ? `Bateria salva por voz: + ${brl(g)} (${q} ${u}s)`
@@ -366,6 +392,7 @@ export function RegisterClient({
       odometer,
       note,
       today,
+      platforms,
       router,
       show,
     ],
@@ -378,10 +405,10 @@ export function RegisterClient({
         return;
       }
       setVoiceInterim(null);
-      const cmd = parseVoiceCommand(text);
+      const cmd = parseVoiceCommand(text, activePlatforms);
       applyVoiceCommand(cmd);
     },
-    [applyVoiceCommand],
+    [applyVoiceCommand, activePlatforms],
   );
 
   const del = (item: RegisterItem) => {
@@ -497,13 +524,12 @@ export function RegisterClient({
             <div className="flex flex-col gap-5">
               {/* plataformas */}
               <div className="grid grid-cols-3 gap-2">
-                {PLATFORM_KEYS.map((p) => {
-                  const meta = PLATFORM_META[p];
-                  const active = platform === p;
+                {activePlatforms.map((meta) => {
+                  const active = platform === meta.id;
                   return (
                     <button
-                      key={p}
-                      onClick={() => pickPlatform(p)}
+                      key={meta.id}
+                      onClick={() => pickPlatform(meta.id)}
                       className={clsx(
                         "pressable rounded-2xl border py-3 text-center",
                         active ? "border-transparent" : "border-white/[0.08] bg-white/[0.03]",
@@ -518,7 +544,7 @@ export function RegisterClient({
                       </span>
                       <span
                         className={clsx(
-                          "mt-1.5 block text-[11px] font-bold",
+                          "mt-1.5 block truncate px-1 text-[11px] font-bold",
                           active ? "text-zinc-100" : "text-zinc-500",
                         )}
                       >
@@ -528,6 +554,15 @@ export function RegisterClient({
                   );
                 })}
               </div>
+              <p className="-mt-2 text-center text-[11px] text-zinc-500">
+                Gerencie seus apps em{" "}
+                <Link
+                  href="/configuracoes"
+                  className="font-semibold text-volt-300 underline-offset-2 hover:underline"
+                >
+                  Configurações
+                </Link>
+              </p>
 
               {/* período */}
               <div>
@@ -859,7 +894,7 @@ export function RegisterClient({
                   style={{
                     backgroundColor:
                       item.kind === "entry"
-                        ? (PLATFORM_META[item.platform]?.color ?? "#a1a1aa")
+                        ? resolvePlatformMeta(item.platform, platforms).color
                         : (TYPE_COLORS[item.platform] ?? "#a1a1aa"),
                   }}
                 />

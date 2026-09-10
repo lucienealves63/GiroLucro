@@ -4,10 +4,10 @@ import { db } from "@/db";
 import { workEntries } from "@/db/schema";
 import { formatDateStr } from "@/lib/format";
 import { getSessionUser } from "@/lib/auth";
+import { getSettings } from "@/lib/data";
+import { isValidPlatformId, parsePlatformsJson } from "@/lib/platforms";
 
 export const dynamic = "force-dynamic";
-
-const PLATFORMS = ["uber", "99", "ifood", "rappi", "direto", "outro"];
 
 /**
  * Marca como recebidos os repasses pendentes de uma plataforma
@@ -25,8 +25,12 @@ export async function POST(req: Request) {
         ? body.until
         : formatDateStr(new Date());
 
-    if (platform !== "all" && !PLATFORMS.includes(platform)) {
-      return NextResponse.json({ error: "Plataforma inválida" }, { status: 400 });
+    if (platform !== "all") {
+      const s = await getSettings(user.id);
+      const platforms = parsePlatformsJson(s.platformsJson);
+      if (!isValidPlatformId(platform, platforms)) {
+        return NextResponse.json({ error: "Plataforma inválida" }, { status: 400 });
+      }
     }
 
     const where =

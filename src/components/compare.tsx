@@ -15,7 +15,9 @@ import {
 import clsx from "clsx";
 import Link from "next/link";
 import type { Insight } from "@/lib/calculations";
-import { PLATFORM_META, brl, hrs, km as fmtKm } from "@/lib/format";
+import { brl, hrs, km as fmtKm } from "@/lib/format";
+import type { PlatformMeta } from "@/lib/platforms";
+import { resolvePlatformMeta } from "@/lib/platforms";
 import { AnimatedNumber, Card, Reveal, SectionTitle, Toast, useToast } from "@/components/ui";
 
 export interface ComparePlatformVM {
@@ -58,6 +60,7 @@ export function CompareClient({
   settlements,
   totalPending,
   hasData,
+  platforms: userPlatforms = [],
 }: {
   week: ComparePeriodVM;
   month: ComparePeriodVM;
@@ -65,6 +68,7 @@ export function CompareClient({
   settlements: SettlementVM[];
   totalPending: number;
   hasData: boolean;
+  platforms?: PlatformMeta[];
 }) {
   const router = useRouter();
   const [period, setPeriod] = useState<"7" | "30">("7");
@@ -73,6 +77,7 @@ export function CompareClient({
   const cur = period === "7" ? week : month;
 
   const bestHour = Math.max(...cur.platforms.map((p) => p.perHour), 0);
+  const metaOf = (id: string) => resolvePlatformMeta(id, userPlatforms);
 
   const settle = (platform: string) => {
     start(async () => {
@@ -84,7 +89,7 @@ export function CompareClient({
       show(
         platform === "all"
           ? "Todos os repasses baixados"
-          : `Repasse do ${PLATFORM_META[platform]?.label} marcado como recebido`,
+          : `Repasse do ${metaOf(platform).label} marcado como recebido`,
       );
       router.refresh();
     });
@@ -173,7 +178,7 @@ export function CompareClient({
                       <motion.div
                         key={p.platform}
                         className="h-full rounded-full"
-                        style={{ backgroundColor: PLATFORM_META[p.platform]?.color ?? "#a1a1aa" }}
+                        style={{ backgroundColor: metaOf(p.platform).color }}
                         initial={{ width: 0 }}
                         animate={{ width: `${p.grossShare * 100}%` }}
                         transition={{ type: "spring", stiffness: 70, damping: 20, delay: i * 0.08 }}
@@ -185,9 +190,9 @@ export function CompareClient({
                       <span key={p.platform} className="flex items-center gap-1.5 text-[11px] font-semibold text-zinc-400">
                         <span
                           className="h-2 w-2 rounded-full"
-                          style={{ backgroundColor: PLATFORM_META[p.platform]?.color }}
+                          style={{ backgroundColor: metaOf(p.platform).color }}
                         />
-                        {PLATFORM_META[p.platform]?.label} {(p.grossShare * 100).toFixed(0)}%
+                        {metaOf(p.platform).label} {(p.grossShare * 100).toFixed(0)}%
                       </span>
                     ))}
                   </div>
@@ -197,7 +202,7 @@ export function CompareClient({
               {/* cards por plataforma */}
               <div className="flex flex-col gap-3">
                 {cur.platforms.map((p, idx) => {
-                  const meta = PLATFORM_META[p.platform] ?? PLATFORM_META.outro;
+                  const meta = metaOf(p.platform);
                   const isBest = p.perHour === bestHour && bestHour > 0;
                   const unit = meta.unit;
                   const waitShare = p.hours > 0 ? Math.round((p.waitMin / 60 / p.hours) * 100) : 0;
@@ -340,7 +345,7 @@ export function CompareClient({
                 {settlements.length > 0 && (
                   <div className="border-t border-white/[0.05]">
                     {settlements.map((s) => {
-                      const meta = PLATFORM_META[s.platform] ?? PLATFORM_META.outro;
+                      const meta = metaOf(s.platform);
                       return (
                         <div
                           key={s.platform}
