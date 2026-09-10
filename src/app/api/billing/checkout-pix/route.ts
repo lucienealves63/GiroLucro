@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { getSessionUser } from "@/lib/auth";
-import { PLANS } from "@/lib/billing";
+import { DEFAULT_PLAN, resolvePlan } from "@/lib/billing";
 import {
   PIX_QR_MINUTES,
   createPixCharge,
@@ -19,8 +19,7 @@ export async function POST(req: Request) {
     if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
 
     const body = await req.json().catch(() => ({}));
-    const plan = PLANS.find((item) => item.id === body.cycle);
-    if (!plan) return NextResponse.json({ error: "Plano inválido" }, { status: 400 });
+    const plan = resolvePlan(typeof body.cycle === "string" ? body.cycle : DEFAULT_PLAN.id);
 
     if (!isMercadoPagoConfigured()) {
       return NextResponse.json(
@@ -30,10 +29,7 @@ export async function POST(req: Request) {
     }
 
     // Reaproveita um Pix pendente do mesmo plano, em vez de criar outro QR.
-    if (
-      user.billingCustomerId?.startsWith("pix:") &&
-      user.planCycle === plan.id
-    ) {
+    if (user.billingCustomerId?.startsWith("pix:") && user.planCycle === plan.id) {
       const pixId = user.billingCustomerId.slice(4);
       try {
         const payment = await getPixPayment(pixId);

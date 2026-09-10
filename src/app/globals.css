@@ -34,34 +34,81 @@
   }
 }
 
-html {
+/* ---------------- tokens de tema (escuro padrão) ---------------- */
+:root,
+html[data-theme="dark"] {
   color-scheme: dark;
+  --gl-bg: #050608;
+  --gl-shell: #08090c;
+  --gl-nav: #0b0d11;
+  --gl-text: #f4f4f5;
+  --gl-muted: #a1a1aa;
+  --gl-border: rgba(255, 255, 255, 0.07);
+  --gl-card: rgba(255, 255, 255, 0.025);
+  --gl-input: rgba(255, 255, 255, 0.03);
+  --gl-glow-a: rgba(184, 245, 60, 0.07);
+  --gl-glow-b: rgba(56, 130, 246, 0.06);
+  --gl-glow-c: rgba(234, 29, 44, 0.05);
+  --gl-texture: rgba(255, 255, 255, 0.025);
+  --gl-nav-fade: #08090c;
+  --gl-toast-bg: #0e1410;
+  --gl-theme-color: #08090c;
+}
+
+html[data-theme="light"] {
+  color-scheme: light;
+  --gl-bg: #eef1ea;
+  --gl-shell: #f7f9f4;
+  --gl-nav: #ffffff;
+  --gl-text: #18181b;
+  --gl-muted: #52525b;
+  --gl-border: rgba(15, 23, 42, 0.1);
+  --gl-card: rgba(255, 255, 255, 0.82);
+  --gl-input: rgba(255, 255, 255, 0.9);
+  --gl-glow-a: rgba(127, 199, 10, 0.12);
+  --gl-glow-b: rgba(56, 130, 246, 0.08);
+  --gl-glow-c: rgba(234, 29, 44, 0.05);
+  --gl-texture: rgba(15, 23, 42, 0.04);
+  --gl-nav-fade: #f7f9f4;
+  --gl-toast-bg: #f0fdf4;
+  --gl-theme-color: #f4f6f1;
+}
+
+html {
   scroll-behavior: smooth;
 }
 
 body {
-  background: #050608;
+  background: var(--gl-bg);
   background-image:
-    radial-gradient(120% 70% at 50% -10%, rgba(184, 245, 60, 0.07), transparent 60%),
-    radial-gradient(90% 60% at 100% 110%, rgba(56, 130, 246, 0.06), transparent 60%),
-    radial-gradient(80% 50% at 0% 100%, rgba(234, 29, 44, 0.05), transparent 60%);
+    radial-gradient(120% 70% at 50% -10%, var(--gl-glow-a), transparent 60%),
+    radial-gradient(90% 60% at 100% 110%, var(--gl-glow-b), transparent 60%),
+    radial-gradient(80% 50% at 0% 100%, var(--gl-glow-c), transparent 60%);
   background-attachment: fixed;
+  color: var(--gl-text);
   -webkit-tap-highlight-color: transparent;
   text-rendering: optimizeLegibility;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 /* Faixa central do app (estilo app mobile sobre fundo ambiente) */
 .app-shell {
-  border-left: 1px solid rgba(255, 255, 255, 0.06);
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: 0 0 120px rgba(0, 0, 0, 0.8);
+  background-color: var(--gl-shell);
+  border-left: 1px solid var(--gl-border);
+  border-right: 1px solid var(--gl-border);
+  box-shadow: 0 0 120px rgba(0, 0, 0, 0.35);
+  transition: background-color 0.25s ease, border-color 0.25s ease;
+}
+
+html[data-theme="light"] .app-shell {
+  box-shadow: 0 0 80px rgba(15, 23, 42, 0.12);
 }
 
 /* Textura de asfalto/grade sutil */
 .texture-road {
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+    linear-gradient(var(--gl-texture) 1px, transparent 1px),
+    linear-gradient(90deg, var(--gl-texture) 1px, transparent 1px);
   background-size: 34px 34px;
   mask-image: linear-gradient(to bottom, black, transparent 85%);
   -webkit-mask-image: linear-gradient(to bottom, black, transparent 85%);
@@ -78,6 +125,8 @@ body {
 input[type="text"],
 input[type="number"],
 input[type="date"],
+input[type="email"],
+input[type="password"],
 textarea,
 select {
   outline: none;
@@ -92,8 +141,12 @@ input::-webkit-inner-spin-button {
 input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 
 /* input date no dark */
-input[type="date"]::-webkit-calendar-picker-indicator {
+html[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator {
   filter: invert(0.7);
+}
+html[data-theme="light"] input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: none;
+  opacity: 0.7;
 }
 
 /* Segmented underline anim */
@@ -110,6 +163,102 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .card-hover:hover {
   border-color: rgba(255, 255, 255, 0.14);
 }
+html[data-theme="light"] .card-hover:hover {
+  border-color: rgba(15, 23, 42, 0.18);
+}
 
 /* gráficos recharts */
 .recharts-wrapper:focus { outline: none; }
+
+/* ---------- ajustes de contraste no tema claro ---------- */
+html[data-theme="light"] .text-zinc-50,
+html[data-theme="light"] .text-zinc-100,
+html[data-theme="light"] .text-zinc-200 {
+  color: #18181b !important;
+}
+html[data-theme="light"] .text-zinc-300 {
+  color: #3f3f46 !important;
+}
+html[data-theme="light"] .text-zinc-400 {
+  color: #52525b !important;
+}
+html[data-theme="light"] .text-zinc-500 {
+  color: #71717a !important;
+}
+html[data-theme="light"] .text-zinc-600,
+html[data-theme="light"] .text-zinc-700 {
+  color: #a1a1aa !important;
+}
+html[data-theme="light"] .placeholder\:text-zinc-700::placeholder {
+  color: #a1a1aa !important;
+}
+html[data-theme="light"] .border-white\/\[0\.05\],
+html[data-theme="light"] .border-white\/\[0\.06\],
+html[data-theme="light"] .border-white\/\[0\.07\],
+html[data-theme="light"] .border-white\/\[0\.08\],
+html[data-theme="light"] .border-white\/\[0\.09\],
+html[data-theme="light"] .border-white\/\[0\.1\],
+html[data-theme="light"] .border-white\/\[0\.12\],
+html[data-theme="light"] .border-white\/10 {
+  border-color: rgba(15, 23, 42, 0.1) !important;
+}
+html[data-theme="light"] .bg-white\/\[0\.02\],
+html[data-theme="light"] .bg-white\/\[0\.025\],
+html[data-theme="light"] .bg-white\/\[0\.03\],
+html[data-theme="light"] .bg-white\/\[0\.04\],
+html[data-theme="light"] .bg-white\/\[0\.045\],
+html[data-theme="light"] .bg-white\/\[0\.05\] {
+  background-color: rgba(255, 255, 255, 0.78) !important;
+}
+html[data-theme="light"] .bg-white\/\[0\.06\],
+html[data-theme="light"] .bg-white\/\[0\.07\],
+html[data-theme="light"] .bg-white\/\[0\.12\] {
+  background-color: rgba(15, 23, 42, 0.06) !important;
+}
+html[data-theme="light"] .from-white\/\[0\.045\] {
+  --tw-gradient-from: rgba(255, 255, 255, 0.95) !important;
+}
+html[data-theme="light"] .to-white\/\[0\.015\] {
+  --tw-gradient-to: rgba(255, 255, 255, 0.7) !important;
+}
+html[data-theme="light"] .text-ink-950 {
+  color: #08090c !important;
+}
+html[data-theme="light"] .bg-\[\#08090c\],
+html[data-theme="light"] .bg-\[\#0b0d11\],
+html[data-theme="light"] .bg-\[\#0e1410\] {
+  background-color: var(--gl-shell) !important;
+}
+html[data-theme="light"] .from-\[\#08090c\] {
+  --tw-gradient-from: var(--gl-nav-fade) !important;
+}
+html[data-theme="light"] .shadow-\[0_18px_40px_-24px_rgba\(0\,0\,0\,0\.8\)\] {
+  box-shadow: 0 18px 40px -24px rgba(15, 23, 42, 0.18) !important;
+}
+html[data-theme="light"] .bg-black\/20 {
+  background-color: rgba(15, 23, 42, 0.12) !important;
+}
+
+/* botão central e volt mantêm contraste no light */
+html[data-theme="light"] .bg-volt-400 {
+  background-color: #8fd40f !important;
+}
+html[data-theme="light"] .text-volt-300,
+html[data-theme="light"] .text-volt-400 {
+  color: #4d7c0f !important;
+}
+html[data-theme="light"] .border-volt-400\/20,
+html[data-theme="light"] .border-volt-400\/25,
+html[data-theme="light"] .border-volt-400\/30,
+html[data-theme="light"] .border-volt-400\/35,
+html[data-theme="light"] .border-volt-400\/50 {
+  border-color: rgba(127, 199, 10, 0.45) !important;
+}
+html[data-theme="light"] .bg-volt-400\/\[0\.05\],
+html[data-theme="light"] .bg-volt-400\/\[0\.06\],
+html[data-theme="light"] .bg-volt-400\/\[0\.07\],
+html[data-theme="light"] .bg-volt-400\/\[0\.08\],
+html[data-theme="light"] .bg-volt-400\/10,
+html[data-theme="light"] .bg-volt-400\/15 {
+  background-color: rgba(143, 212, 15, 0.14) !important;
+}

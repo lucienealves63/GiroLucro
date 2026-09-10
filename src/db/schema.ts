@@ -21,7 +21,7 @@ export const users = pgTable(
     passwordHash: text("password_hash").notNull(),
     // assinatura: trialing | active | canceled
     planStatus: text("plan_status").notNull().default("trialing"),
-    planCycle: text("plan_cycle"), // monthly | yearly
+    planCycle: text("plan_cycle"), // lifetime | monthly | yearly (legado)
     trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
     currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
     billingCustomerId: text("billing_customer_id"), // id no gateway (Stripe/Mercado Pago)

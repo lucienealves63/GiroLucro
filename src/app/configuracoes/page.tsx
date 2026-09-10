@@ -15,11 +15,18 @@ export default async function ConfiguracoesPage() {
   const trial = trialDaysLeft(user);
   let planLabel = "Teste grátis";
   if (user.planStatus === "active" && user.currentPeriodEnd) {
-    planLabel = `Pro ${user.planCycle === "yearly" ? "anual" : "mensal"} · até ${user.currentPeriodEnd.toLocaleDateString("pt-BR")}`;
+    // lifetime ou legado com período muito longo (~10+ anos)
+    const isLifetime =
+      user.planCycle === "lifetime" ||
+      user.planCycle === null ||
+      user.currentPeriodEnd.getFullYear() >= 2100;
+    planLabel = isLifetime
+      ? "Pro vitalício · pagamento único"
+      : `Pro · até ${user.currentPeriodEnd.toLocaleDateString("pt-BR")}`;
   } else if (user.planStatus === "canceled" && hasAccess(user) && user.currentPeriodEnd) {
-    planLabel = `Pro até ${user.currentPeriodEnd.toLocaleDateString("pt-BR")} · sem renovação`;
+    planLabel = `Pro até ${user.currentPeriodEnd.toLocaleDateString("pt-BR")}`;
   } else if (user.planStatus === "canceled") {
-    planLabel = "Assinatura encerrada";
+    planLabel = "Acesso encerrado";
   } else if (user.planStatus === "pending_payment") {
     planLabel = "Pagamento em confirmação";
   } else if (trial !== null && trial > 0) {

@@ -12,6 +12,8 @@ import {
   Fuel,
   Gauge,
   LogOut,
+  Moon,
+  Sun,
   Trash2,
   TriangleAlert,
   Wallet,
@@ -21,6 +23,7 @@ import clsx from "clsx";
 import Link from "next/link";
 import { brl, parseBR } from "@/lib/format";
 import { Field, SectionTitle, Toast, useToast } from "@/components/ui";
+import { useTheme, type Theme } from "@/components/theme-provider";
 
 export interface SettingsForm {
   vehicleType: string;
@@ -53,6 +56,7 @@ export function SettingsClient({
   const router = useRouter();
   const [pending, start] = useTransition();
   const { msg, show } = useToast();
+  const { theme, setTheme, ready: themeReady } = useTheme();
 
   const f = (n: number) => String(n).replace(".", ",");
   const [form, setForm] = useState({
@@ -173,6 +177,57 @@ export function SettingsClient({
               <LogOut className="h-4 w-4" />
               Sair da conta
             </button>
+          </div>
+        </div>
+
+        {/* aparência */}
+        <div>
+          <SectionTitle>Aparência</SectionTitle>
+          <div className="rounded-3xl border border-white/[0.07] bg-white/[0.02] p-5">
+            <p className="mb-3 text-[12.5px] leading-snug text-zinc-400">
+              Escolha o tema do app. A preferência fica salva neste aparelho.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {(
+                [
+                  { id: "dark" as Theme, label: "Escuro", icon: Moon, hint: "asfalto à noite" },
+                  { id: "light" as Theme, label: "Claro", icon: Sun, hint: "pista de dia" },
+                ] as const
+              ).map((opt) => {
+                const active = themeReady && theme === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setTheme(opt.id)}
+                    className={clsx(
+                      "pressable flex flex-col items-start gap-1 rounded-2xl border px-3.5 py-3 text-left",
+                      active
+                        ? "border-volt-400/50 bg-volt-400/15"
+                        : "border-white/[0.08] bg-white/[0.03]",
+                    )}
+                  >
+                    <span className="flex items-center gap-2">
+                      <opt.icon
+                        className={clsx(
+                          "h-4 w-4",
+                          active ? "text-volt-300" : "text-zinc-500",
+                        )}
+                      />
+                      <span
+                        className={clsx(
+                          "text-[13px] font-bold",
+                          active ? "text-volt-300" : "text-zinc-300",
+                        )}
+                      >
+                        {opt.label}
+                      </span>
+                    </span>
+                    <span className="text-[10.5px] text-zinc-500">{opt.hint}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 

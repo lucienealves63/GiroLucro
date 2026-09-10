@@ -14,9 +14,11 @@ import {
   Gauge,
   HandCoins,
   Lightbulb,
+  Moon,
   Package,
   PiggyBank,
   Settings2,
+  Sun,
   Timer,
   Trash2,
   TrendingUp,
@@ -39,6 +41,7 @@ import {
   Toast,
   useToast,
 } from "@/components/ui";
+import { useTheme } from "@/components/theme-provider";
 
 export interface RecentItem {
   id: number;
@@ -94,6 +97,7 @@ export function Dashboard({ vm }: { vm: DashboardVM }) {
   const d = vm.todayStats;
   const lucroPct = d.gross > 0 ? Math.max(0, d.net / d.gross) : 0;
   const hasToday = d.gross > 0;
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <div className="px-5">
@@ -109,6 +113,18 @@ export function Dashboard({ vm }: { vm: DashboardVM }) {
               Teste: {vm.trialDaysLeft} {vm.trialDaysLeft === 1 ? "dia" : "dias"}
             </Link>
           )}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            aria-label={theme === "dark" ? "Ativar tema claro" : "Ativar tema escuro"}
+            className="pressable flex h-10 w-10 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.04] text-zinc-400"
+          >
+            {theme === "dark" ? (
+              <Sun className="h-[18px] w-[18px]" />
+            ) : (
+              <Moon className="h-[18px] w-[18px]" />
+            )}
+          </button>
           <Link
             href="/configuracoes"
             aria-label="Configurações"

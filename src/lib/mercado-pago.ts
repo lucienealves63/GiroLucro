@@ -123,11 +123,14 @@ async function mpFetch<T>(
   return data;
 }
 
-/** Cria assinatura pendente e retorna o checkout hospedado pelo Mercado Pago. */
+/**
+ * Cria cobrança única (preferência Checkout Pro) — R$ 19,90 vitalício.
+ * Mantém o nome createSubscription por compatibilidade com as rotas existentes.
+ */
 export async function createSubscription(options: {
   userId: number;
   userEmail: string;
-  cycle: "monthly" | "yearly";
+  cycle: "lifetime" | "monthly" | "yearly";
   priceInCents: number;
   trialEndsAt?: Date | null;
 }) {
@@ -141,37 +144,48 @@ export async function createSubscription(options: {
   }
 
   const appUrl = getAppUrl();
-  const startDate =
-    options.trialEndsAt && options.trialEndsAt.getTime() > Date.now() + 5 * 60_000
-      ? options.trialEndsAt.toISOString()
-      : undefined;
+  const cycle = options.cycle === "lifetime" ? "lifetime" : "lifetime";
+  const amount = options.priceInCents / 100;
 
-  const subscription = await mpFetch<MercadoPagoSubscription>("/preapproval", {
-    method: "POST",
-    body: {
-      reason: `GiroLucro Pro — ${options.cycle === "yearly" ? "Anual" : "Mensal"}`,
-      external_reference: `girolucro:${options.userId}:${options.cycle}`,
-      payer_email: options.userEmail,
-      back_url: `${appUrl}/assinatura/sucesso`,
-      status: "pending",
-      auto_recurring: {
-        frequency: options.cycle === "yearly" ? 12 : 1,
-        frequency_type: "months",
-        transaction_amount: options.priceInCents / 100,
-        currency_id: "BRL",
-        ...(startDate ? { start_date: startDate } : {}),
+  // Preferência de pagamento único (Checkout Pro) — sem recorrência.
+  const preference = await mpFetch<{ id?: string; init_point?: string; sandbox_init_point?: string }>(
+    "/checkout/preferences",
+    {
+      method: "POST",
+      body: {
+        items: [
+          {
+            id: "girolucro-pro-lifetime",
+            title: "GiroLucro Pro — Acesso vitalício",
+            description: "Pagamento único · sem mensalidade",
+            quantity: 1,
+            currency_id: "BRL",
+            unit_price: amount,
+          },
+        ],
+        payer: { email: options.userEmail },
+        external_reference: `girolucro:${options.userId}:${cycle}`,
+        notification_url: `${appUrl}/api/billing/webhook`,
+        back_urls: {
+          success: `${appUrl}/assinatura/sucesso`,
+          pending: `${appUrl}/assinatura`,
+          failure: `${appUrl}/assinatura`,
+        },
+        auto_return: "approved",
+        statement_descriptor: "GIROLUCRO PRO",
       },
     },
-  });
+  );
 
-  if (!subscription.id || !subscription.init_point) {
+  const checkoutUrl = preference.init_point || preference.sandbox_init_point;
+  if (!preference.id || !checkoutUrl) {
     throw new Error("Mercado Pago não retornou o link de checkout");
   }
 
   return {
     mode: "mercado_pago" as const,
-    subscriptionId: subscription.id,
-    checkoutUrl: subscription.init_point,
+    subscriptionId: `pref:${preference.id}`,
+    checkoutUrl,
   };
 }
 
@@ -193,7 +207,7 @@ export function getPixPayment(id: string): Promise<MercadoPagoPixPayment> {
   return mpFetch(`/v1/payments/${encodeURIComponent(id)}`);
 }
 
-/** Gera um Pix à vista (pagamento único) e retorna o QR Code. */
+/** Gera um Pix à vista (pagamento único vitalício) e retorna o QR Code. */
 export async function createPixCharge({
   userId,
   userEmail,
@@ -202,13 +216,14 @@ export async function createPixCharge({
 }: {
   userId: number;
   userEmail: string;
-  cycle: "monthly" | "yearly";
+  cycle: "lifetime" | "monthly" | "yearly";
   priceInCents: number;
 }) {
   if (!accessToken) throw new Error("billing_not_configured");
 
   const appUrl = getAppUrl();
   const expiresAt = new Date(Date.now() + PIX_QR_MINUTES * 60_000);
+  const normalizedCycle = cycle === "lifetime" ? "lifetime" : "lifetime";
 
   const payment = await mpFetch<MercadoPagoPixPayment>("/v1/payments", {
     method: "POST",
@@ -218,8 +233,9 @@ export async function createPixCharge({
     body: {
       transaction_amount: priceInCents / 100,
       payment_method_id: "pix",
+      description: "GiroLucro Pro — Acesso vitalício (pagamento único)",
       payer: { email: userEmail },
-      external_reference: `girolucro:${userId}:${cycle}`,
+      external_reference: `girolucro:${userId}:${normalizedCycle}`,
       notification_url: `${appUrl}/api/billing/webhook`,
       date_of_expiration: expiresAt.toISOString(),
     },
@@ -283,14 +299,14 @@ export function verifyMercadoPagoSignature(req: Request, resourceId: string): bo
 
 export function parseGiroLucroReference(reference?: string | null): {
   userId: number;
-  cycle: "monthly" | "yearly";
+  cycle: "lifetime" | "monthly" | "yearly";
 } | null {
   if (!reference) return null;
-  const modern = reference.match(/^girolucro:(\d+):(monthly|yearly)$/);
-  const legacy = reference.match(/^girolucro-(\d+)-(monthly|yearly)$/);
+  const modern = reference.match(/^girolucro:(\d+):(lifetime|monthly|yearly)$/);
+  const legacy = reference.match(/^girolucro-(\d+)-(lifetime|monthly|yearly)$/);
   const match = modern ?? legacy;
   if (!match) return null;
   const userId = Number(match[1]);
   if (!Number.isInteger(userId) || userId <= 0) return null;
-  return { userId, cycle: match[2] as "monthly" | "yearly" };
+  return { userId, cycle: match[2] as "lifetime" | "monthly" | "yearly" };
 }
