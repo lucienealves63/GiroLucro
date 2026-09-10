@@ -35,8 +35,8 @@ export function BottomNav() {
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-[460px]">
-      <div className="pointer-events-none absolute inset-x-0 -top-10 h-10 bg-gradient-to-t from-[#08090c] to-transparent" />
-      <div className="border-t border-white/[0.07] bg-[#0b0d11]/95 pb-[max(env(safe-area-inset-bottom),10px)] pt-2 backdrop-blur-xl">
+      <div className="pointer-events-none absolute inset-x-0 -top-10 h-10 bg-gradient-to-t from-[var(--gl-nav-fade)] to-transparent" />
+      <div className="border-t border-white/[0.07] bg-[color:var(--gl-nav)]/95 pb-[max(env(safe-area-inset-bottom),10px)] pt-2 backdrop-blur-xl">
         <div className="grid grid-cols-5 items-end px-2">
           {items.map((item) => {
             const active =

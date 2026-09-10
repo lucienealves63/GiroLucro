@@ -13,12 +13,25 @@ export const dynamic = "force-dynamic";
  * (padrão: "girolucro-setup" — troque em produção!).
  *
  * É idempotente: rodar duas vezes não quebra nada
- * (tabelas existentes são detectadas e puladas).
+ * (tabelas/colunas/índices existentes são detectados).
  */
 
-const STATEMENTS: { name: string; sql: string }[] = [
+type SetupKind = "table" | "index" | "column";
+
+type SetupStatement = {
+  name: string;
+  kind: SetupKind;
+  /** Para kind=column: tabela alvo. */
+  table?: string;
+  /** Para kind=column: nome da coluna. */
+  column?: string;
+  sql: string;
+};
+
+const STATEMENTS: SetupStatement[] = [
   {
     name: "billing_events",
+    kind: "table",
     sql: `CREATE TABLE IF NOT EXISTS "billing_events" (
       "id" serial PRIMARY KEY NOT NULL,
       "provider" text DEFAULT 'mercado_pago' NOT NULL,
@@ -32,6 +45,7 @@ const STATEMENTS: { name: string; sql: string }[] = [
   },
   {
     name: "expenses",
+    kind: "table",
     sql: `CREATE TABLE IF NOT EXISTS "expenses" (
       "id" serial PRIMARY KEY NOT NULL,
       "user_id" integer,
@@ -45,6 +59,7 @@ const STATEMENTS: { name: string; sql: string }[] = [
   },
   {
     name: "maintenances",
+    kind: "table",
     sql: `CREATE TABLE IF NOT EXISTS "maintenances" (
       "id" serial PRIMARY KEY NOT NULL,
       "user_id" integer,
@@ -59,6 +74,7 @@ const STATEMENTS: { name: string; sql: string }[] = [
   },
   {
     name: "notification_logs",
+    kind: "table",
     sql: `CREATE TABLE IF NOT EXISTS "notification_logs" (
       "id" serial PRIMARY KEY NOT NULL,
       "user_id" integer NOT NULL,
@@ -71,6 +87,7 @@ const STATEMENTS: { name: string; sql: string }[] = [
   },
   {
     name: "push_subscriptions",
+    kind: "table",
     sql: `CREATE TABLE IF NOT EXISTS "push_subscriptions" (
       "id" serial PRIMARY KEY NOT NULL,
       "user_id" integer NOT NULL,
@@ -84,6 +101,7 @@ const STATEMENTS: { name: string; sql: string }[] = [
   },
   {
     name: "sessions",
+    kind: "table",
     sql: `CREATE TABLE IF NOT EXISTS "sessions" (
       "token" text PRIMARY KEY NOT NULL,
       "user_id" integer NOT NULL,
@@ -93,6 +111,7 @@ const STATEMENTS: { name: string; sql: string }[] = [
   },
   {
     name: "password_reset_tokens",
+    kind: "table",
     sql: `CREATE TABLE IF NOT EXISTS "password_reset_tokens" (
       "id" serial PRIMARY KEY NOT NULL,
       "user_id" integer NOT NULL,
@@ -104,6 +123,7 @@ const STATEMENTS: { name: string; sql: string }[] = [
   },
   {
     name: "settings",
+    kind: "table",
     sql: `CREATE TABLE IF NOT EXISTS "settings" (
       "id" serial PRIMARY KEY NOT NULL,
       "user_id" integer,
@@ -120,11 +140,13 @@ const STATEMENTS: { name: string; sql: string }[] = [
       "work_days_per_week" integer DEFAULT 6 NOT NULL,
       "reserve_percent" numeric(5, 2) DEFAULT 10 NOT NULL,
       "initial_odometer" numeric(10, 1) DEFAULT 0 NOT NULL,
+      "platforms_json" text,
       "updated_at" timestamp with time zone DEFAULT now() NOT NULL
     )`,
   },
   {
     name: "users",
+    kind: "table",
     sql: `CREATE TABLE IF NOT EXISTS "users" (
       "id" serial PRIMARY KEY NOT NULL,
       "name" text NOT NULL,
@@ -140,6 +162,7 @@ const STATEMENTS: { name: string; sql: string }[] = [
   },
   {
     name: "work_entries",
+    kind: "table",
     sql: `CREATE TABLE IF NOT EXISTS "work_entries" (
       "id" serial PRIMARY KEY NOT NULL,
       "user_id" integer,
@@ -157,17 +180,66 @@ const STATEMENTS: { name: string; sql: string }[] = [
   },
   {
     name: "users_email_idx",
+    kind: "index",
     sql: `CREATE UNIQUE INDEX IF NOT EXISTS "users_email_idx" ON "users" USING btree ("email")`,
   },
   {
     name: "password_reset_token_hash_idx",
+    kind: "index",
     sql: `CREATE UNIQUE INDEX IF NOT EXISTS "password_reset_token_hash_idx" ON "password_reset_tokens" USING btree ("token_hash")`,
   },
   {
     name: "settings_user_idx",
+    kind: "index",
     sql: `CREATE UNIQUE INDEX IF NOT EXISTS "settings_user_idx" ON "settings" USING btree ("user_id")`,
   },
+  {
+    name: "billing_events_provider_key_idx",
+    kind: "index",
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS "billing_events_provider_key_idx" ON "billing_events" USING btree ("provider", "event_key")`,
+  },
+  // Migration: bancos antigos (tabela settings já existia sem a coluna)
+  {
+    name: "settings.platforms_json",
+    kind: "column",
+    table: "settings",
+    column: "platforms_json",
+    sql: `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "platforms_json" text`,
+  },
 ];
+
+async function alreadyExists(st: SetupStatement): Promise<boolean> {
+  if (st.kind === "table") {
+    const r = await pool.query("SELECT to_regclass($1) AS reg", [`public.${st.name}`]);
+    return !!r.rows[0]?.reg;
+  }
+  if (st.kind === "index") {
+    const r = await pool.query("SELECT 1 FROM pg_indexes WHERE indexname = $1 LIMIT 1", [
+      st.name,
+    ]);
+    return (r.rowCount ?? 0) > 0;
+  }
+  // column
+  const r = await pool.query(
+    `SELECT 1
+       FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = $1
+        AND column_name = $2
+      LIMIT 1`,
+    [st.table, st.column],
+  );
+  return (r.rowCount ?? 0) > 0;
+}
+
+function tagLabel(kind: SetupKind, created: boolean): { css: string; text: string } {
+  if (!created) {
+    return { css: "skip-tag", text: "JÁ EXISTIA" };
+  }
+  if (kind === "column") return { css: "ok-tag", text: "COLUNA ✓" };
+  if (kind === "index") return { css: "ok-tag", text: "ÍNDICE ✓" };
+  return { css: "ok-tag", text: "CRIADA ✓" };
+}
 
 function page(title: string, rows: string, ok: boolean): string {
   return `<!doctype html>
@@ -189,11 +261,11 @@ function page(title: string, rows: string, ok: boolean): string {
     .title.ok { color: #b8f53c; }
     .title.erro { color: #fb7185; }
     ul { list-style: none; margin: 14px 0; }
-    li { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 13.5px; }
-    li b { font-weight: 600; }
-    .ok-tag { color: #b8f53c; font-weight: 700; font-size: 12px; }
-    .skip-tag { color: #fbbf24; font-weight: 700; font-size: 12px; }
-    .err-tag { color: #fb7185; font-weight: 700; font-size: 12px; }
+    li { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 13.5px; }
+    li b { font-weight: 600; word-break: break-all; }
+    .ok-tag { color: #b8f53c; font-weight: 700; font-size: 12px; white-space: nowrap; }
+    .skip-tag { color: #fbbf24; font-weight: 700; font-size: 12px; white-space: nowrap; }
+    .err-tag { color: #fb7185; font-weight: 700; font-size: 12px; white-space: nowrap; }
     .next { display: block; text-align: center; margin-top: 20px; background: #b8f53c; color: #08090c; font-weight: 800; padding: 14px; border-radius: 14px; text-decoration: none; font-size: 15px; }
     .hint { margin-top: 16px; font-size: 11.5px; color: #71717a; line-height: 1.6; }
     code { background: rgba(255,255,255,0.08); padding: 1px 6px; border-radius: 6px; font-size: 11px; }
@@ -213,7 +285,8 @@ function page(title: string, rows: string, ok: boolean): string {
     <p class="hint">
       Por segurança, defina <code>ADMIN_SETUP_TOKEN</code> com um valor só seu nas
       variáveis de ambiente — assim ninguém mais roda este setup.
-      Cada tabela já é criada com segurança: rodar duas vezes não tem problema.
+      Cada tabela/coluna já é criada com segurança: rodar duas vezes não tem problema.
+      A coluna <code>settings.platforms_json</code> habilita apps personalizados.
     </p>
   </div>
 </body>
@@ -240,44 +313,35 @@ export async function GET(req: Request) {
 
   for (const st of STATEMENTS) {
     try {
-      // checa existência antes para informar corretamente
-      const key = st.name.includes("idx") ? "index" : "table";
-      let exists = false;
-      if (key === "table") {
-        const r = await pool.query("SELECT to_regclass($1) AS reg", [`public.${st.name}`]);
-        exists = !!r.rows[0].reg;
-      } else {
-        const r = await pool.query(
-          "SELECT 1 FROM pg_indexes WHERE indexname = $1",
-          [st.name],
-        );
-        exists = r.rowCount! > 0;
-      }
-
+      const exists = await alreadyExists(st);
       await pool.query(st.sql);
-      if (exists) {
-        skipped++;
-        results.push(
-          `<li><b>${st.name}</b><span class="skip-tag">JÁ EXISTIA</span></li>`,
-        );
-      } else {
+
+      // Re-checa colunas após o ALTER (ADD IF NOT EXISTS)
+      const existsAfter = st.kind === "column" ? await alreadyExists(st) : exists;
+      const wasCreated = st.kind === "column" ? !exists && existsAfter : !exists;
+
+      if (wasCreated) {
         created++;
-        results.push(
-          `<li><b>${st.name}</b><span class="ok-tag">CRIADA ✓</span></li>`,
-        );
+        const tag = tagLabel(st.kind, true);
+        results.push(`<li><b>${st.name}</b><span class="${tag.css}">${tag.text}</span></li>`);
+      } else {
+        skipped++;
+        const tag = tagLabel(st.kind, false);
+        results.push(`<li><b>${st.name}</b><span class="${tag.css}">${tag.text}</span></li>`);
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       failed++;
+      const message = e instanceof Error ? e.message : String(e);
       results.push(
         `<li><b>${st.name}</b><span class="err-tag">ERRO</span></li>`,
       );
-      console.error(`Setup [${st.name}]:`, e.message);
+      console.error(`Setup [${st.name}]:`, message);
     }
   }
 
   const ok = failed === 0;
   const title = ok
-    ? `Setup concluído! ${created} criada(s), ${skipped} já existiam.`
+    ? `Setup concluído! ${created} nova(s), ${skipped} já existiam.`
     : `${failed} erro(s) no setup — confira a DATABASE_URL`;
 
   return new NextResponse(page(title, results.join(""), ok), {

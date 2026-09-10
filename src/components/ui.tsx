@@ -195,7 +195,7 @@ export function Toast({ msg }: { msg: string | null }) {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 12, scale: 0.96 }}
           transition={{ type: "spring", stiffness: 400, damping: 28 }}
-          className="fixed inset-x-0 bottom-24 z-[60] mx-auto flex w-fit max-w-[90%] items-center gap-2 rounded-2xl border border-volt-400/30 bg-[#0e1410]/95 px-4 py-2.5 text-[13px] font-semibold text-volt-200 shadow-[0_16px_44px_-10px_rgba(184,245,60,0.35)] backdrop-blur-xl"
+          className="fixed inset-x-0 bottom-24 z-[60] mx-auto flex w-fit max-w-[90%] items-center gap-2 rounded-2xl border border-volt-400/30 bg-[color:var(--gl-toast-bg)]/95 px-4 py-2.5 text-[13px] font-semibold text-volt-200 shadow-[0_16px_44px_-10px_rgba(184,245,60,0.35)] backdrop-blur-xl"
         >
           <CheckCircle2 className="h-4 w-4 text-volt-400" />
           {msg}

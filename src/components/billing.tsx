@@ -15,8 +15,8 @@ import {
   Sparkles,
   Timer,
 } from "lucide-react";
-import clsx from "clsx";
 import type { Plan } from "@/lib/billing";
+import { DEFAULT_PLAN } from "@/lib/billing";
 import { brl } from "@/lib/format";
 import { Logo } from "@/components/brand";
 import { Toast, useToast } from "@/components/ui";
@@ -52,7 +52,7 @@ export function BillingClient({
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [selected, setSelected] = useState<string>("yearly");
+  const plan = plans[0] ?? DEFAULT_PLAN;
   const { msg, show } = useToast();
   const showRef = useRef(show);
   useEffect(() => {
@@ -69,13 +69,13 @@ export function BillingClient({
       const res = await fetch("/api/billing/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cycle: selected }),
+        body: JSON.stringify({ cycle: plan.id }),
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.checkoutUrl) {
         window.location.href = data.checkoutUrl;
       } else if (res.ok && data.ok) {
-        show("Plano de demonstração ativado");
+        show("Acesso Pro liberado");
         router.push("/");
         router.refresh();
       } else {
@@ -92,7 +92,7 @@ export function BillingClient({
         const res = await fetch("/api/billing/checkout-pix", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ cycle: selected }),
+          body: JSON.stringify({ cycle: plan.id }),
         });
         const data = (await res.json()) as PixResponse;
         if (res.ok && data.ok && (data.qrCode || data.qrCodeBase64) && data.expiresAt) {
@@ -106,16 +106,6 @@ export function BillingClient({
         setPixPending(false);
       }
     })();
-  };
-
-  const cancel = () => {
-    if (!window.confirm("Cancelar a renovação automática? Você mantém o acesso até o fim do período.")) return;
-    start(async () => {
-      const response = await fetch("/api/billing/cancel", { method: "POST" });
-      const data = await response.json().catch(() => ({}));
-      show(response.ok ? "Renovação cancelada" : (data.error ?? "Falha ao cancelar"));
-      if (response.ok) router.refresh();
-    });
   };
 
   const copyQrCode = async () => {
@@ -234,9 +224,14 @@ export function BillingClient({
               Você é Pro, {firstName}.
             </h1>
             <p className="mt-2 text-[13.5px] leading-relaxed text-zinc-400">
-              Acesso total liberado até{" "}
-              <span className="font-semibold text-volt-300">{periodEnd}</span>
-              {cycle === "yearly" ? " (plano anual)" : " (plano mensal)"}.
+              Acesso total liberado
+              {periodEnd ? (
+                <>
+                  {" "}
+                  · válido até <span className="font-semibold text-volt-300">{periodEnd}</span>
+                </>
+              ) : null}
+              {cycle ? " · pagamento único." : "."}
             </p>
           </>
         ) : status === "trialing" ? (
@@ -248,7 +243,7 @@ export function BillingClient({
               </span>
             </h1>
             <p className="mt-2 text-[13.5px] leading-relaxed text-zinc-400">
-              Assine agora e a primeira cobrança será programada para depois do trial.
+              Pague uma vez e libere o Pro para sempre — sem mensalidade e sem renovação.
             </p>
           </>
         ) : status === "pending" ? (
@@ -264,12 +259,12 @@ export function BillingClient({
         ) : status === "canceled" ? (
           <>
             <h1 className="font-display text-[28px] font-bold leading-tight tracking-tight text-zinc-50">
-              Renovação cancelada, {firstName}.
+              Acesso encerrado, {firstName}.
             </h1>
             <p className="mt-2 text-[13.5px] leading-relaxed text-zinc-400">
               {periodEnd
                 ? `Seu acesso já pago continua até ${periodEnd}. Você pode reativar quando quiser.`
-                : "Escolha um plano para voltar a usar os recursos Pro."}
+                : "Faça o pagamento único para voltar a usar os recursos Pro."}
             </p>
           </>
         ) : (
@@ -278,58 +273,37 @@ export function BillingClient({
               Seu teste acabou, {firstName}.
             </h1>
             <p className="mt-2 text-[13.5px] leading-relaxed text-zinc-400">
-              Para continuar registrando giros e acompanhando seu lucro real, escolha
-              um plano — custa menos que um litro de gasolina.
+              Para continuar registrando giros e acompanhando seu lucro real, libere o Pro
+              com um pagamento único — custa menos que um litro de gasolina.
             </p>
           </>
         )}
       </motion.div>
 
-      {/* planos */}
-      <div className="mt-6 flex flex-col gap-3">
-        {plans.map((p, i) => {
-          const active = selected === p.id;
-          return (
-            <motion.button
-              key={p.id}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.08 + i * 0.07, type: "spring", stiffness: 90, damping: 18 }}
-              onClick={() => setSelected(p.id)}
-              className={clsx(
-                "pressable relative overflow-hidden rounded-3xl border p-5 text-left",
-                active ? "border-volt-400/50 bg-volt-400/[0.07]" : "border-white/[0.09] bg-white/[0.02]",
-              )}
-            >
-              {p.highlight && (
-                <span className="absolute right-4 top-4 rounded-full bg-volt-400 px-2.5 py-1 text-[9.5px] font-bold uppercase tracking-wider text-ink-950">
-                  Mais escolhido
-                </span>
-              )}
-              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-zinc-500">
-                Plano {p.label}
-              </p>
-              <p className="mt-1.5 flex items-baseline gap-1.5">
-                <span className="tabular font-display text-[32px] font-bold leading-none text-zinc-50">
-                  {brl(p.price)}
-                </span>
-                <span className="text-[13px] font-semibold text-zinc-500">
-                  /{p.id === "monthly" ? "mês" : "ano"}
-                </span>
-              </p>
-              <p className="mt-1.5 text-[12px] font-medium text-volt-300">{p.tagline}</p>
-              <span
-                className={clsx(
-                  "absolute bottom-5 right-5 flex h-6 w-6 items-center justify-center rounded-full border",
-                  active ? "border-volt-400 bg-volt-400" : "border-white/[0.15]",
-                )}
-              >
-                {active && <Check className="h-4 w-4 text-ink-950" strokeWidth={3} />}
-              </span>
-            </motion.button>
-          );
-        })}
-      </div>
+      {/* plano único */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.08, type: "spring", stiffness: 90, damping: 18 }}
+        className="relative mt-6 overflow-hidden rounded-3xl border border-volt-400/50 bg-volt-400/[0.07] p-5 text-left"
+      >
+        <span className="absolute right-4 top-4 rounded-full bg-volt-400 px-2.5 py-1 text-[9.5px] font-bold uppercase tracking-wider text-ink-950">
+          Pagamento único
+        </span>
+        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-zinc-500">
+          GiroLucro Pro
+        </p>
+        <p className="mt-1.5 flex items-baseline gap-1.5">
+          <span className="tabular font-display text-[36px] font-bold leading-none text-zinc-50">
+            {brl(plan.price)}
+          </span>
+          <span className="text-[13px] font-semibold text-zinc-500">uma vez</span>
+        </p>
+        <p className="mt-1.5 text-[12px] font-medium text-volt-300">{plan.tagline}</p>
+        <span className="absolute bottom-5 right-5 flex h-6 w-6 items-center justify-center rounded-full border border-volt-400 bg-volt-400">
+          <Check className="h-4 w-4 text-ink-950" strokeWidth={3} />
+        </span>
+      </motion.div>
 
       <motion.div
         initial={{ opacity: 0 }}
@@ -363,8 +337,8 @@ export function BillingClient({
               : status === "pending"
                 ? "Continuar pagamento"
                 : status === "canceled"
-                  ? `Reativar Pro · ${brl(plans.find((p) => p.id === selected)?.price ?? 0)}`
-                  : `Assinar GiroLucro Pro · ${brl(plans.find((p) => p.id === selected)?.price ?? 0)}`}
+                  ? `Reativar Pro · ${brl(plan.price)}`
+                  : `Liberar Pro · ${brl(plan.price)}`}
           </button>
 
           {!pix && (
@@ -374,9 +348,7 @@ export function BillingClient({
               className="pressable mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-volt-400/35 bg-volt-400/[0.07] py-4 font-display text-[15.5px] font-bold text-volt-300 disabled:opacity-50"
             >
               {pixPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <QrCode className="h-5 w-5" strokeWidth={2.4} />}
-              {pixPending
-                ? "Gerando Pix..."
-                : `Pagar com Pix · ${brl(plans.find((p) => p.id === selected)?.price ?? 0)}`}
+              {pixPending ? "Gerando Pix..." : `Pagar com Pix · ${brl(plan.price)}`}
             </button>
           )}
         </>
@@ -417,8 +389,8 @@ export function BillingClient({
 
           <p className="mt-3 text-center text-[12px] text-zinc-400">
             Escaneie o QR Code no app do seu banco e confirme o pagamento.{" "}
-            <span className="font-semibold text-zinc-200">Pagamento único</span>, sem
-            renovação automática.
+            <span className="font-semibold text-zinc-200">Pagamento único de {brl(plan.price)}</span>
+            , sem renovação automática.
           </p>
 
           {pix.qrCode && (
@@ -458,20 +430,13 @@ export function BillingClient({
           >
             Voltar ao app
           </Link>
-          <button
-            onClick={cancel}
-            disabled={pending}
-            className="pressable mx-auto text-[12px] font-semibold text-zinc-500 underline-offset-4 hover:underline disabled:opacity-50"
-          >
-            Cancelar renovação automática
-          </button>
         </div>
       )}
 
       <p className="mt-4 flex items-start justify-center gap-1.5 text-center text-[10.5px] leading-relaxed text-zinc-600">
         <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-        Pagamento seguro. Sem fidelidade — cancele quando quiser e mantenha o acesso
-        até o fim do período.
+        Pagamento seguro via Mercado Pago. Valor único de {brl(plan.price)} — sem
+        mensalidade e sem renovação automática.
       </p>
 
       <Toast msg={msg} />

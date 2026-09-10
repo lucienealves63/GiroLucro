@@ -1,10 +1,10 @@
 import type { Expense, Maintenance, Settings, WorkEntry } from "@/db/schema";
 import {
   MAINT_META,
-  PLATFORM_META,
   lastNDays,
   monthOf,
   platformName,
+  resolvePlatformMeta,
   weekdayName,
 } from "@/lib/format";
 
@@ -407,7 +407,7 @@ export function buildInsights(
     }
     // retorno vazio: km por entrega muito acima do menor
     const deliveries = plats.filter(
-      (p) => PLATFORM_META[p.platform]?.category === "delivery" && p.quantity >= 5,
+      (p) => resolvePlatformMeta(p.platform).category === "delivery" && p.quantity >= 5,
     );
     if (deliveries.length >= 2) {
       const heavy = [...deliveries].sort((a, b) => b.kmPerDelivery - a.kmPerDelivery)[0];
@@ -435,7 +435,7 @@ export function buildInsights(
     }
     // destaque por entrega para apps de comida
     const bestDelivery = plats
-      .filter((p) => PLATFORM_META[p.platform]?.category === "delivery" && p.quantity >= 5)
+      .filter((p) => resolvePlatformMeta(p.platform).category === "delivery" && p.quantity >= 5)
       .sort((a, b) => b.perDelivery - a.perDelivery)[0];
     if (bestDelivery) {
       out.push({

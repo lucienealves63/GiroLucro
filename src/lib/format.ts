@@ -109,31 +109,32 @@ export function monthOf(dateStr: string): string {
   return dateStr.slice(0, 7);
 }
 
-export type PlatformCategory = "ride" | "delivery";
+export type { PlatformCategory, PlatformMeta } from "@/lib/platforms";
+export {
+  BUILTIN_PLATFORMS,
+  resolvePlatformMeta,
+  platformsMap,
+  enabledPlatforms,
+  parsePlatformsJson,
+  platformName,
+} from "@/lib/platforms";
 
-export const PLATFORM_META: Record<
-  string,
-  {
-    label: string;
-    color: string;
-    soft: string;
-    initials: string;
-    category: PlatformCategory;
-    unit: string; // corrida | entrega
-  }
-> = {
-  uber: { label: "Uber", color: "#E8E8E8", soft: "rgba(232,232,232,0.14)", initials: "U", category: "ride", unit: "corrida" },
-  "99": { label: "99", color: "#FFD300", soft: "rgba(255,211,0,0.14)", initials: "99", category: "ride", unit: "corrida" },
-  ifood: { label: "iFood", color: "#EA1D2C", soft: "rgba(234,29,44,0.16)", initials: "iF", category: "delivery", unit: "entrega" },
-  rappi: { label: "Rappi", color: "#FF441F", soft: "rgba(255,68,31,0.15)", initials: "R", category: "delivery", unit: "entrega" },
-  direto: { label: "Direto", color: "#34D399", soft: "rgba(52,211,153,0.14)", initials: "D", category: "delivery", unit: "entrega" },
-  outro: { label: "Outros", color: "#7DD3FC", soft: "rgba(125,211,252,0.14)", initials: "•", category: "ride", unit: "corrida" },
-};
+import {
+  BUILTIN_PLATFORMS,
+  resolvePlatformMeta,
+  type PlatformMeta,
+} from "@/lib/platforms";
+
+/** Mapa estático dos apps padrão (compatível com código legado). */
+export const PLATFORM_META: Record<string, PlatformMeta> = Object.fromEntries(
+  BUILTIN_PLATFORMS.map((p) => [p.id, p]),
+);
 
 export const PLATFORM_KEYS = ["uber", "99", "ifood", "rappi", "direto", "outro"] as const;
 
-export function platformName(p: string): string {
-  return PLATFORM_META[p]?.label ?? "Outros";
+/** Resolve label; aceita lista do usuário para apps customizados. */
+export function platformLabel(p: string, list?: PlatformMeta[] | null): string {
+  return resolvePlatformMeta(p, list).label;
 }
 
 export const EXPENSE_META: Record<string, { label: string }> = {

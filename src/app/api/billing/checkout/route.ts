@@ -3,11 +3,10 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { getSessionUser, hasAccess } from "@/lib/auth";
-import { PLANS } from "@/lib/billing";
+import { DEFAULT_PLAN, resolvePlan } from "@/lib/billing";
 import {
   billingDemoEnabled,
   createSubscription,
-  getSubscription,
   isMercadoPagoConfigured,
 } from "@/lib/mercado-pago";
 
@@ -19,37 +18,14 @@ export async function POST(req: Request) {
     if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
 
     const body = await req.json().catch(() => ({}));
-    const plan = PLANS.find((item) => item.id === body.cycle);
-    if (!plan) return NextResponse.json({ error: "Plano inválido" }, { status: 400 });
+    // Aceita qualquer cycle enviado; sempre resolve para o plano único vitalício.
+    const plan = resolvePlan(typeof body.cycle === "string" ? body.cycle : DEFAULT_PLAN.id);
 
     if (!isMercadoPagoConfigured() && !billingDemoEnabled) {
       return NextResponse.json(
         { error: "Os pagamentos ainda não foram configurados pelo administrador." },
         { status: 503 },
       );
-    }
-
-    // Evita criar várias assinaturas quando o usuário toca no botão novamente.
-    if (
-      isMercadoPagoConfigured() &&
-      user.billingCustomerId &&
-      user.planCycle === plan.id &&
-      user.planStatus !== "canceled"
-    ) {
-      try {
-        const existing = await getSubscription(user.billingCustomerId);
-        if (existing.status === "pending" && existing.init_point) {
-          return NextResponse.json({ ok: true, checkoutUrl: existing.init_point });
-        }
-        if (existing.status === "authorized") {
-          return NextResponse.json(
-            { error: "O pagamento está sendo confirmado. Atualize a página em instantes." },
-            { status: 409 },
-          );
-        }
-      } catch {
-        // Se a assinatura remota não existir mais, cria outra abaixo.
-      }
     }
 
     const result = await createSubscription({
@@ -85,7 +61,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, checkoutUrl: result.checkoutUrl });
   } catch (error) {
-    console.error("[billing] Falha ao criar checkout de assinatura:", error);
+    console.error("[billing] Falha ao criar checkout:", error);
     return NextResponse.json(
       { error: "Não foi possível abrir o checkout. Tente novamente." },
       { status: 502 },

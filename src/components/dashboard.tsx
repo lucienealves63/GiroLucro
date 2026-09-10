@@ -14,9 +14,11 @@ import {
   Gauge,
   HandCoins,
   Lightbulb,
+  Moon,
   Package,
   PiggyBank,
   Settings2,
+  Sun,
   Timer,
   Trash2,
   TrendingUp,
@@ -39,6 +41,7 @@ import {
   Toast,
   useToast,
 } from "@/components/ui";
+import { useTheme } from "@/components/theme-provider";
 
 export interface RecentItem {
   id: number;
@@ -90,10 +93,20 @@ const PLATFORM_DOT: Record<string, string> = {
   manutencao: "bg-orange-400",
 };
 
+const PLATFORM_HEX: Record<string, string> = {
+  uber: "#E8E8E8",
+  "99": "#FFD300",
+  ifood: "#EA1D2C",
+  rappi: "#FF441F",
+  direto: "#34D399",
+  outro: "#7DD3FC",
+};
+
 export function Dashboard({ vm }: { vm: DashboardVM }) {
   const d = vm.todayStats;
   const lucroPct = d.gross > 0 ? Math.max(0, d.net / d.gross) : 0;
   const hasToday = d.gross > 0;
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <div className="px-5">
@@ -109,6 +122,18 @@ export function Dashboard({ vm }: { vm: DashboardVM }) {
               Teste: {vm.trialDaysLeft} {vm.trialDaysLeft === 1 ? "dia" : "dias"}
             </Link>
           )}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            aria-label={theme === "dark" ? "Ativar tema claro" : "Ativar tema escuro"}
+            className="pressable flex h-10 w-10 items-center justify-center rounded-full border border-white/[0.08] bg-white/[0.04] text-zinc-400"
+          >
+            {theme === "dark" ? (
+              <Sun className="h-[18px] w-[18px]" />
+            ) : (
+              <Moon className="h-[18px] w-[18px]" />
+            )}
+          </button>
           <Link
             href="/configuracoes"
             aria-label="Configurações"
@@ -520,8 +545,13 @@ function Recents({ recents }: { recents: RecentItem[] }) {
             <span
               className={clsx(
                 "h-2 w-2 shrink-0 rounded-full",
-                PLATFORM_DOT[item.platform] ?? "bg-zinc-400",
+                PLATFORM_DOT[item.platform] ?? (item.kind === "entry" ? "" : "bg-zinc-400"),
               )}
+              style={
+                !PLATFORM_DOT[item.platform] && item.kind === "entry"
+                  ? { backgroundColor: PLATFORM_HEX[item.platform] ?? "#a1a1aa" }
+                  : undefined
+              }
             />
             <div className="min-w-0">
               <p className="truncate text-[13px] font-semibold text-zinc-200">{item.label}</p>

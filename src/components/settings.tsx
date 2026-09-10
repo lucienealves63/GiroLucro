@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Bike,
@@ -9,9 +9,15 @@ import {
   Check,
   Crown,
   Database,
+  Eye,
+  EyeOff,
   Fuel,
   Gauge,
   LogOut,
+  Moon,
+  Plus,
+  Smartphone,
+  Sun,
   Trash2,
   TriangleAlert,
   Wallet,
@@ -20,7 +26,14 @@ import {
 import clsx from "clsx";
 import Link from "next/link";
 import { brl, parseBR } from "@/lib/format";
+import {
+  CUSTOM_COLORS,
+  PLATFORM_CATEGORIES,
+  type PlatformCategory,
+  type PlatformMeta,
+} from "@/lib/platforms";
 import { Field, SectionTitle, Toast, useToast } from "@/components/ui";
+import { useTheme, type Theme } from "@/components/theme-provider";
 
 export interface SettingsForm {
   vehicleType: string;
@@ -42,6 +55,7 @@ export function SettingsClient({
   monthlyFixed,
   dailyFixed,
   hasData,
+  platforms: initialPlatforms,
 }: {
   account: { name: string; email: string; planLabel: string; isPro: boolean };
   settings: SettingsForm;
@@ -49,10 +63,12 @@ export function SettingsClient({
   monthlyFixed: number;
   dailyFixed: number;
   hasData: boolean;
+  platforms: PlatformMeta[];
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const { msg, show } = useToast();
+  const { theme, setTheme, ready: themeReady } = useTheme();
 
   const f = (n: number) => String(n).replace(".", ",");
   const [form, setForm] = useState({
@@ -68,6 +84,15 @@ export function SettingsClient({
     initialOdometer: f(settings.initialOdometer),
   });
   const set = (k: keyof typeof form) => (v: string) => setForm((p) => ({ ...p, [k]: v }));
+
+  const [platforms, setPlatforms] = useState<PlatformMeta[]>(initialPlatforms);
+  useEffect(() => {
+    setPlatforms(initialPlatforms);
+  }, [initialPlatforms]);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newLabel, setNewLabel] = useState("");
+  const [newCategory, setNewCategory] = useState<PlatformCategory>("delivery");
+  const [newColor, setNewColor] = useState(CUSTOM_COLORS[0]);
 
   const liveCostPerKm =
     (parseBR(form.kmPerLiter) > 0 ? parseBR(form.fuelPrice) / parseBR(form.kmPerLiter) : 0) +
@@ -124,6 +149,69 @@ export function SettingsClient({
     });
   };
 
+  const applyPlatformsResponse = async (body: Record<string, unknown>, okMsg: string) => {
+    const res = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && Array.isArray(data.platforms)) {
+      setPlatforms(data.platforms as PlatformMeta[]);
+      show(okMsg);
+      router.refresh();
+      return true;
+    }
+    show(data.error ?? "Não foi possível atualizar os apps");
+    return false;
+  };
+
+  const togglePlatform = (id: string) => {
+    start(async () => {
+      await applyPlatformsResponse({ togglePlatformId: id }, "Apps atualizados");
+    });
+  };
+
+  const removePlatform = (p: PlatformMeta) => {
+    const label = p.custom
+      ? `Remover "${p.label}" da sua lista? Histórico antigo continua intacto.`
+      : `Ocultar "${p.label}" da tela de registro? Você pode reativar depois.`;
+    if (!window.confirm(label)) return;
+    start(async () => {
+      await applyPlatformsResponse(
+        { removePlatformId: p.id },
+        p.custom ? "App removido" : "App ocultado",
+      );
+    });
+  };
+
+  const addPlatform = () => {
+    const label = newLabel.trim();
+    if (label.length < 2) {
+      show("Digite o nome do app (mín. 2 letras)");
+      return;
+    }
+    start(async () => {
+      const ok = await applyPlatformsResponse(
+        {
+          addPlatform: {
+            label,
+            category: newCategory,
+            color: newColor,
+            unit: newCategory === "delivery" ? "entrega" : "corrida",
+          },
+        },
+        `"${label}" adicionado`,
+      );
+      if (ok) {
+        setNewLabel("");
+        setShowAdd(false);
+        setNewCategory("delivery");
+        setNewColor(CUSTOM_COLORS[(platforms.length + 1) % CUSTOM_COLORS.length]);
+      }
+    });
+  };
+
   return (
     <div className="px-5 pb-10">
       <header className="pb-5 pt-6">
@@ -173,6 +261,241 @@ export function SettingsClient({
               <LogOut className="h-4 w-4" />
               Sair da conta
             </button>
+          </div>
+        </div>
+
+        {/* aparência */}
+        <div>
+          <SectionTitle>Aparência</SectionTitle>
+          <div className="rounded-3xl border border-white/[0.07] bg-white/[0.02] p-5">
+            <p className="mb-3 text-[12.5px] leading-snug text-zinc-400">
+              Escolha o tema do app. A preferência fica salva neste aparelho.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {(
+                [
+                  { id: "dark" as Theme, label: "Escuro", icon: Moon, hint: "asfalto à noite" },
+                  { id: "light" as Theme, label: "Claro", icon: Sun, hint: "pista de dia" },
+                ] as const
+              ).map((opt) => {
+                const active = themeReady && theme === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setTheme(opt.id)}
+                    className={clsx(
+                      "pressable flex flex-col items-start gap-1 rounded-2xl border px-3.5 py-3 text-left",
+                      active
+                        ? "border-volt-400/50 bg-volt-400/15"
+                        : "border-white/[0.08] bg-white/[0.03]",
+                    )}
+                  >
+                    <span className="flex items-center gap-2">
+                      <opt.icon
+                        className={clsx(
+                          "h-4 w-4",
+                          active ? "text-volt-300" : "text-zinc-500",
+                        )}
+                      />
+                      <span
+                        className={clsx(
+                          "text-[13px] font-bold",
+                          active ? "text-volt-300" : "text-zinc-300",
+                        )}
+                      >
+                        {opt.label}
+                      </span>
+                    </span>
+                    <span className="text-[10.5px] text-zinc-500">{opt.hint}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* apps / formas de ganho */}
+        <div>
+          <SectionTitle
+            right={
+              <span className="text-[11px] font-bold text-zinc-400">
+                {platforms.filter((p) => p.enabled !== false).length} ativos
+              </span>
+            }
+          >
+            Formas de ganho
+          </SectionTitle>
+          <div className="rounded-3xl border border-white/[0.07] bg-white/[0.02] p-5">
+            <p className="mb-3 flex items-start gap-2 text-[12.5px] leading-snug text-zinc-400">
+              <Smartphone className="mt-0.5 h-4 w-4 shrink-0 text-volt-400" />
+              Ative só os apps que você usa, oculte os demais ou cadastre um novo
+              (Lalamove, James, particular…).
+            </p>
+
+            <div className="flex flex-col gap-2">
+              {platforms.map((p) => {
+                const on = p.enabled !== false;
+                return (
+                  <div
+                    key={p.id}
+                    className={clsx(
+                      "flex items-center gap-3 rounded-2xl border px-3 py-2.5",
+                      on
+                        ? "border-white/[0.08] bg-white/[0.03]"
+                        : "border-white/[0.05] bg-white/[0.015] opacity-70",
+                    )}
+                  >
+                    <span
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl font-display text-[11px] font-bold"
+                      style={{ backgroundColor: p.color, color: "#0b0d10" }}
+                    >
+                      {p.initials}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[13px] font-bold text-zinc-100">
+                        {p.label}
+                        {p.custom && (
+                          <span className="ml-1.5 rounded-full bg-white/[0.06] px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-zinc-400">
+                            seu
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-[10.5px] text-zinc-500">
+                        {p.category === "delivery" ? "Entrega" : "Corrida"} · {p.unit}
+                        {!on && " · oculto"}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => togglePlatform(p.id)}
+                      disabled={pending}
+                      aria-label={on ? "Ocultar app" : "Ativar app"}
+                      className="pressable rounded-xl border border-white/[0.08] p-2 text-zinc-400 hover:text-volt-300 disabled:opacity-40"
+                    >
+                      {on ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                    </button>
+                    {(p.custom || on) && (
+                      <button
+                        type="button"
+                        onClick={() => removePlatform(p)}
+                        disabled={pending}
+                        aria-label={p.custom ? "Remover app" : "Ocultar app"}
+                        className="pressable rounded-xl border border-rose-400/20 p-2 text-zinc-500 hover:text-rose-400 disabled:opacity-40"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <AnimatePresence>
+              {showAdd && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="mt-3 rounded-2xl border border-volt-400/25 bg-volt-400/[0.05] p-3.5">
+                    <label className="block">
+                      <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.12em] text-zinc-500">
+                        Nome do app
+                      </span>
+                      <input
+                        type="text"
+                        value={newLabel}
+                        onChange={(e) => setNewLabel(e.target.value)}
+                        placeholder="Ex: Lalamove, James, Particular"
+                        maxLength={40}
+                        className="w-full rounded-2xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-3 text-[14px] text-zinc-100 placeholder:text-zinc-700"
+                      />
+                    </label>
+                    <p className="mb-1.5 mt-3 text-[11px] font-bold uppercase tracking-[0.12em] text-zinc-500">
+                      Tipo
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {PLATFORM_CATEGORIES.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => setNewCategory(c.id)}
+                          className={clsx(
+                            "pressable rounded-2xl border px-3 py-2.5 text-left",
+                            newCategory === c.id
+                              ? "border-volt-400/50 bg-volt-400/15"
+                              : "border-white/[0.08] bg-white/[0.03]",
+                          )}
+                        >
+                          <p
+                            className={clsx(
+                              "text-[12.5px] font-bold",
+                              newCategory === c.id ? "text-volt-300" : "text-zinc-300",
+                            )}
+                          >
+                            {c.label}
+                          </p>
+                          <p className="text-[10.5px] text-zinc-500">unidade: {c.unit}</p>
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mb-1.5 mt-3 text-[11px] font-bold uppercase tracking-[0.12em] text-zinc-500">
+                      Cor
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {CUSTOM_COLORS.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setNewColor(c)}
+                          aria-label={`Cor ${c}`}
+                          className={clsx(
+                            "h-8 w-8 rounded-full border-2 transition",
+                            newColor === c ? "border-zinc-50 scale-110" : "border-transparent",
+                          )}
+                          style={{ backgroundColor: c }}
+                        />
+                      ))}
+                    </div>
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={addPlatform}
+                        disabled={pending || newLabel.trim().length < 2}
+                        className="pressable flex flex-1 items-center justify-center gap-2 rounded-2xl bg-volt-400 py-3 text-[13px] font-bold text-ink-950 disabled:opacity-40"
+                      >
+                        <Check className="h-4 w-4" strokeWidth={3} />
+                        Adicionar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowAdd(false);
+                          setNewLabel("");
+                        }}
+                        className="pressable rounded-2xl border border-white/[0.08] px-4 py-3 text-[13px] font-bold text-zinc-400"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {!showAdd && (
+              <button
+                type="button"
+                onClick={() => setShowAdd(true)}
+                disabled={pending}
+                className="pressable mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-volt-400/35 bg-volt-400/[0.06] py-3 text-[13px] font-bold text-volt-300 disabled:opacity-50"
+              >
+                <Plus className="h-4 w-4" strokeWidth={2.6} />
+                Adicionar novo app
+              </button>
+            )}
           </div>
         </div>
 

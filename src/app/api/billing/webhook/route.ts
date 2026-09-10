@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { billingEvents, users, type User } from "@/db/schema";
-import { PLANS, type Plan } from "@/lib/billing";
+import { DEFAULT_PLAN, resolvePlan, type Plan } from "@/lib/billing";
 import {
   getAuthorizedPayment,
   getPayment,
@@ -30,21 +30,18 @@ function validSubscriptionForUser(
 ): boolean {
   const reference = parseGiroLucroReference(subscription.external_reference);
   const amount = Number(subscription.auto_recurring?.transaction_amount);
-  const expectedFrequency = plan.id === "yearly" ? 12 : 1;
   const payerMatches =
     !subscription.payer_email ||
     subscription.payer_email.toLowerCase() === user.email.toLowerCase();
 
+  // Planos legados (assinatura) ou preferência única
   return (
     !!reference &&
     reference.userId === user.id &&
-    reference.cycle === plan.id &&
     user.billingCustomerId === subscription.id &&
     Number.isFinite(amount) &&
     Math.abs(amount - plan.price) < 0.011 &&
     subscription.auto_recurring?.currency_id === "BRL" &&
-    subscription.auto_recurring?.frequency_type === "months" &&
-    Number(subscription.auto_recurring?.frequency) === expectedFrequency &&
     payerMatches
   );
 }
@@ -71,15 +68,32 @@ async function findValidatedContext(subscription: MercadoPagoSubscription) {
   if (!reference) return null;
 
   const [user] = await db.select().from(users).where(eq(users.id, reference.userId)).limit(1);
-  const plan = PLANS.find((item) => item.id === reference.cycle);
+  const plan = resolvePlan(reference.cycle);
   if (!user || !plan || !validSubscriptionForUser(subscription, user, plan)) return null;
   return { user, plan };
 }
 
+async function activateLifetime(userId: number, eventId: number) {
+  const currentPeriodEnd = new Date(Date.now() + DEFAULT_PLAN.days * 86400000);
+  await db.transaction(async (tx) => {
+    await tx
+      .update(users)
+      .set({
+        planStatus: "active",
+        planCycle: "lifetime",
+        currentPeriodEnd,
+      })
+      .where(eq(users.id, userId));
+    await tx
+      .update(billingEvents)
+      .set({ userId, status: "processed" })
+      .where(eq(billingEvents.id, eventId));
+  });
+}
+
 /**
  * Webhook oficial do Mercado Pago.
- * Tópicos configurados no painel: subscription_preapproval,
- * subscription_authorized_payment e payment.
+ * Tópicos: payment (Pix + Checkout Pro), e legados de assinatura.
  */
 export async function POST(req: Request) {
   let claimedEventId: number | null = null;
@@ -100,9 +114,11 @@ export async function POST(req: Request) {
 
     // Outros tópicos assinados podem ser ignorados sem provocar novas tentativas.
     if (
-      !["subscription_preapproval", "subscription_authorized_payment", "payment"].includes(
-        eventType,
-      )
+      ![
+        "subscription_preapproval",
+        "subscription_authorized_payment",
+        "payment",
+      ].includes(eventType)
     ) {
       return NextResponse.json({ ok: true, ignored: true });
     }
@@ -140,6 +156,7 @@ export async function POST(req: Request) {
       paymentApproved = invoice.payment?.status === "approved";
       chargeDate = invoice.debit_date ?? invoice.date_created;
     } else {
+      // payment — Pix à vista ou Checkout Pro (pagamento único)
       const payment = await getPayment(resourceId);
       const reference = parseGiroLucroReference(payment.external_reference);
       if (!reference) {
@@ -154,7 +171,7 @@ export async function POST(req: Request) {
         .from(users)
         .where(eq(users.id, reference.userId))
         .limit(1);
-      const referencedPlan = PLANS.find((item) => item.id === reference.cycle);
+      const referencedPlan = resolvePlan(reference.cycle);
       if (!referencedUser || !referencedPlan) {
         await db
           .update(billingEvents)
@@ -163,47 +180,43 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true, rejected: true });
       }
 
-      // Pix à vista: pagamento único identificado por billingCustomerId = pix:{id}.
-      if (referencedUser.billingCustomerId === `pix:${String(payment.id)}`) {
-        const pixAmount = Number(payment.transaction_amount);
-        const validAmount =
-          Number.isFinite(pixAmount) && Math.abs(pixAmount - referencedPlan.price) < 0.011;
-        const validCurrency = String(payment.currency_id ?? "").toUpperCase() === "BRL";
-        const pixApproved = payment.status === "approved";
+      const payAmount = Number(payment.transaction_amount);
+      const validAmount =
+        Number.isFinite(payAmount) && Math.abs(payAmount - referencedPlan.price) < 0.011;
+      const validCurrency = String(payment.currency_id ?? "").toUpperCase() === "BRL";
+      const payApproved = payment.status === "approved";
 
-        if (pixApproved && validAmount && validCurrency) {
-          const currentPeriodEnd = new Date(
-            Date.now() + referencedPlan.days * 86400000,
-          );
-          await db.transaction(async (tx) => {
-            await tx
+      // Pix à vista ou Checkout Pro (pagamento único vitalício)
+      const isPix = referencedUser.billingCustomerId === `pix:${String(payment.id)}`;
+      const isPreference = referencedUser.billingCustomerId?.startsWith("pref:") ?? false;
+      const isLifetimeRef = reference.cycle === "lifetime";
+
+      if (isPix || isPreference || isLifetimeRef) {
+        if (payApproved && validAmount && validCurrency) {
+          await activateLifetime(referencedUser.id, claimed.id);
+          if (!referencedUser.billingCustomerId?.startsWith("pix:")) {
+            await db
               .update(users)
               .set({
-                planStatus: "active",
-                planCycle: referencedPlan.id,
-                currentPeriodEnd,
+                billingCustomerId:
+                  referencedUser.billingCustomerId ?? `pay:${String(payment.id)}`,
               })
               .where(eq(users.id, referencedUser.id));
-            await tx
-              .update(billingEvents)
-              .set({ userId: referencedUser.id, status: "processed" })
-              .where(eq(billingEvents.id, claimed.id));
-          });
+          }
           return NextResponse.json({ ok: true, activated: true });
         }
 
-        const pixStatus =
-          !pixApproved && payment.status !== "rejected" ? "observed" : "rejected";
+        const payStatus =
+          !payApproved && payment.status !== "rejected" ? "observed" : "rejected";
         await db
           .update(billingEvents)
-          .set({ userId: referencedUser.id, status: pixStatus })
+          .set({ userId: referencedUser.id, status: payStatus })
           .where(eq(billingEvents.id, claimed.id));
         return NextResponse.json({ ok: true, activated: false });
       }
 
-      // Ramo antigo (assinatura): rejeita sem lançar quando não há
-      // billingCustomerId ou quando o pagamento é um Pix à vista.
-      if (!referencedUser.billingCustomerId || referencedUser.billingCustomerId.startsWith("pix:")) {
+      // Ramo legado (assinatura recorrente)
+      if (!referencedUser.billingCustomerId || referencedUser.billingCustomerId.startsWith("pix:") || referencedUser.billingCustomerId.startsWith("pref:")) {
         await db
           .update(billingEvents)
           .set({ status: "rejected" })
@@ -256,21 +269,8 @@ export async function POST(req: Request) {
     }
 
     if (paymentApproved) {
-      const currentPeriodEnd = periodEndFrom(subscription, plan, chargeDate);
-      await db.transaction(async (tx) => {
-        await tx
-          .update(users)
-          .set({
-            planStatus: "active",
-            planCycle: plan.id,
-            currentPeriodEnd,
-          })
-          .where(eq(users.id, user.id));
-        await tx
-          .update(billingEvents)
-          .set({ userId: user.id, status: "processed" })
-          .where(eq(billingEvents.id, claimed.id));
-      });
+      // Mesmo em assinaturas legadas, promove para lifetime com o preço atual
+      await activateLifetime(user.id, claimed.id);
       return NextResponse.json({ ok: true, activated: true });
     }
 

@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { workEntries } from "@/db/schema";
 import { getSessionUser } from "@/lib/auth";
+import { getSettings } from "@/lib/data";
+import { isValidPlatformId, parsePlatformsJson } from "@/lib/platforms";
 
 export const dynamic = "force-dynamic";
 
-const PLATFORMS = ["uber", "99", "ifood", "rappi", "direto", "outro"];
 const PERIODS = ["madrugada", "manha", "tarde", "noite"];
 
 export async function POST(req: Request) {
@@ -27,7 +28,10 @@ export async function POST(req: Request) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return NextResponse.json({ error: "Data inválida" }, { status: 400 });
     }
-    if (!PLATFORMS.includes(platform)) {
+
+    const s = await getSettings(user.id);
+    const platforms = parsePlatformsJson(s.platformsJson);
+    if (!isValidPlatformId(platform, platforms)) {
       return NextResponse.json({ error: "Plataforma inválida" }, { status: 400 });
     }
     if (!Number.isFinite(gross) || gross <= 0 || gross > 100000) {

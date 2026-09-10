@@ -1,5 +1,5 @@
 export interface Plan {
-  id: "monthly" | "yearly";
+  id: "lifetime";
   label: string;
   price: number;
   days: number;
@@ -7,23 +7,22 @@ export interface Plan {
   highlight?: boolean;
 }
 
+/** Pagamento único — libera o Pro por tempo indeterminado (lifetime). */
+export const LIFETIME_DAYS = 36500; // ~100 anos
+
 export const PLANS: Plan[] = [
   {
-    id: "monthly",
-    label: "Mensal",
+    id: "lifetime",
+    label: "Vitalício",
     price: 19.9,
-    days: 30,
-    tagline: "Flexibilidade total",
-  },
-  {
-    id: "yearly",
-    label: "Anual",
-    price: 149.9,
-    days: 365,
-    tagline: "Equivale a R$ 12,49/mês · 2 meses grátis",
+    days: LIFETIME_DAYS,
+    tagline: "Pagamento único · acesso total sem mensalidade",
     highlight: true,
   },
 ];
+
+/** Plano único usado em todo o app. */
+export const DEFAULT_PLAN = PLANS[0];
 
 export const PRO_FEATURES = [
   "Lucro real automático (combustível, manutenção, custos fixos)",
@@ -33,4 +32,20 @@ export const PRO_FEATURES = [
   "Controle de repasses que os apps te devem",
   "Alertas de manutenção por quilômetro rodado",
   "Metas diárias, fundo de dias fracos e provisão de férias",
+  "Comandos de voz para registrar giros e gastos",
 ];
+
+/** Aceita ids legados (monthly/yearly) e o atual (lifetime). */
+export type PlanCycleId = "lifetime" | "monthly" | "yearly";
+
+export function resolvePlan(cycle?: string | null): Plan {
+  if (cycle === "lifetime") return DEFAULT_PLAN;
+  // Migração: planos antigos mensais/anuais ainda batem no preço único ao reativar
+  return DEFAULT_PLAN;
+}
+
+export function planLabel(cycle?: string | null): string {
+  if (cycle === "yearly") return "anual (legado)";
+  if (cycle === "monthly") return "mensal (legado)";
+  return "vitalício";
+}

@@ -2,6 +2,7 @@ import { SettingsClient } from "@/components/settings";
 import { hasAccess, requireUser, trialDaysLeft } from "@/lib/auth";
 import { getAppData } from "@/lib/data";
 import { costPerKm, dailyFixedShare, monthlyFixed } from "@/lib/calculations";
+import { parsePlatformsJson } from "@/lib/platforms";
 
 export const dynamic = "force-dynamic";
 
@@ -11,15 +12,23 @@ export default async function ConfiguracoesPage() {
   const user = await requireUser();
   const data = await getAppData(user.id);
   const s = data.settings;
+  const platforms = parsePlatformsJson(s.platformsJson);
 
   const trial = trialDaysLeft(user);
   let planLabel = "Teste grátis";
   if (user.planStatus === "active" && user.currentPeriodEnd) {
-    planLabel = `Pro ${user.planCycle === "yearly" ? "anual" : "mensal"} · até ${user.currentPeriodEnd.toLocaleDateString("pt-BR")}`;
+    // lifetime ou legado com período muito longo (~10+ anos)
+    const isLifetime =
+      user.planCycle === "lifetime" ||
+      user.planCycle === null ||
+      user.currentPeriodEnd.getFullYear() >= 2100;
+    planLabel = isLifetime
+      ? "Pro vitalício · pagamento único"
+      : `Pro · até ${user.currentPeriodEnd.toLocaleDateString("pt-BR")}`;
   } else if (user.planStatus === "canceled" && hasAccess(user) && user.currentPeriodEnd) {
-    planLabel = `Pro até ${user.currentPeriodEnd.toLocaleDateString("pt-BR")} · sem renovação`;
+    planLabel = `Pro até ${user.currentPeriodEnd.toLocaleDateString("pt-BR")}`;
   } else if (user.planStatus === "canceled") {
-    planLabel = "Assinatura encerrada";
+    planLabel = "Acesso encerrado";
   } else if (user.planStatus === "pending_payment") {
     planLabel = "Pagamento em confirmação";
   } else if (trial !== null && trial > 0) {
@@ -54,6 +63,7 @@ export default async function ConfiguracoesPage() {
       monthlyFixed={monthlyFixed(s)}
       dailyFixed={dailyFixedShare(s)}
       hasData={data.entries.length > 0}
+      platforms={platforms}
     />
   );
 }

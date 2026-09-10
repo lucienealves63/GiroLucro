@@ -11,7 +11,6 @@ import {
 import { getAppData } from "@/lib/data";
 import {
   EXPENSE_META,
-  PLATFORM_META,
   brl,
   hrs,
   km as fmtKm,
@@ -20,6 +19,7 @@ import {
   todayStr,
   weekdayShort,
 } from "@/lib/format";
+import { parsePlatformsJson, resolvePlatformMeta } from "@/lib/platforms";
 import type { DashboardVM, RecentItem } from "@/components/dashboard";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +29,7 @@ export default async function Home() {
   const data = await getAppData(user.id);
   const today = todayStr();
   const s = data.settings;
+  const platforms = parsePlatformsJson(s.platformsJson);
 
   const hasAny = data.entries.length > 0 || data.expenses.length > 0;
   const todayStats = computeDay(today, data.entries, data.expenses, s);
@@ -44,14 +45,12 @@ export default async function Home() {
 
   const recents: RecentItem[] = [
     ...data.entries.map((e) => {
-      const meta = PLATFORM_META[e.platform];
-      const unit = meta?.unit ?? "corrida";
+      const meta = resolvePlatformMeta(e.platform, platforms);
+      const unit = meta.unit;
       return {
         id: e.id,
         kind: "entry" as const,
-        label: meta?.label
-          ? `${meta.label}${e.quantity > 1 ? ` · ${e.quantity} ${unit}s` : ""}`
-          : "Giro",
+        label: `${meta.label}${e.quantity > 1 ? ` · ${e.quantity} ${unit}s` : ""}`,
         sub: `${hrs(e.hours)} · ${fmtKm(e.km)}${e.waitMinutes > 0 ? ` · ${Math.round(e.waitMinutes)}min espera` : ""}${!e.settled ? " · a receber" : ""}`,
         amount: e.gross,
         positive: true,
