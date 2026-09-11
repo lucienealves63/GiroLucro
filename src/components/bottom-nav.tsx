@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   ArrowLeftRight,
   Home,
@@ -26,12 +27,34 @@ const HIDDEN_PREFIXES = [
   "/esqueci-senha",
   "/redefinir-senha",
   "/assinatura",
+  "/landing",
+  "/bem-vindo",
+  "/sobre",
 ];
 
 export function BottomNav() {
   const pathname = usePathname();
+  const [isPublicRoot, setIsPublicRoot] = useState(false);
+
+  // Se estiver em "/" mas a landing pública estiver renderizada (visitante não logado), esconde o nav
+  useEffect(() => {
+    if (pathname !== "/") {
+      setIsPublicRoot(false);
+      return;
+    }
+    const check = () => {
+      const hasLanding = !!document.querySelector("[data-landing-root]");
+      setIsPublicRoot(hasLanding);
+    };
+    check();
+    // observa mudanças (a landing pode montar depois)
+    const obs = new MutationObserver(check);
+    obs.observe(document.body, { childList: true, subtree: true });
+    return () => obs.disconnect();
+  }, [pathname]);
 
   if (HIDDEN_PREFIXES.some((p) => pathname.startsWith(p))) return null;
+  if (isPublicRoot) return null;
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-[460px]">
