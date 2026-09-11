@@ -89,7 +89,7 @@ const BATTLE_MOCK = [
 
 export function LandingClient({ isLogged }: LandingProps) {
   return (
-    <div className="relative left-1/2 w-screen -translate-x-1/2">
+    <div data-landing-root={isLogged ? undefined : "true"} className="relative left-1/2 w-screen -translate-x-1/2">
       {/* ---------- HEADER ---------- */}
       <header className="sticky top-0 z-40 w-full border-b border-white/[0.06] bg-[#08090c]/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1080px] items-center justify-between px-5 py-3.5 md:px-8">

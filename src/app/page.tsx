@@ -1,5 +1,7 @@
+import { redirect } from "next/navigation";
 import { Dashboard } from "@/components/dashboard";
-import { requireUser, trialDaysLeft } from "@/lib/auth";
+import { LandingClient } from "@/components/landing-client";
+import { getSessionUser, hasAccess, trialDaysLeft } from "@/lib/auth";
 import {
   buildInsights,
   computeDay,
@@ -25,7 +27,17 @@ import type { DashboardVM, RecentItem } from "@/components/dashboard";
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const user = await requireUser({ needsAccess: true });
+  const user = await getSessionUser();
+
+  // Visitante não logado → landing pública (conversão)
+  if (!user) {
+    return <LandingClient isLogged={false} />;
+  }
+
+  // Logado mas sem acesso (trial expirado / sem plano) → paywall
+  if (!hasAccess(user)) {
+    redirect("/assinatura");
+  }
   const data = await getAppData(user.id);
   const today = todayStr();
   const s = data.settings;
