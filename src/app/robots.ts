@@ -5,7 +5,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: "*",
-        allow: ["/entrar", "/criar-conta", "/esqueci-senha"],
+        allow: ["/", "/landing", "/bem-vindo", "/sobre", "/entrar", "/criar-conta", "/esqueci-senha"],
         disallow: [
           "/api",
           "/redefinir-senha",
@@ -18,5 +18,6 @@ export default function robots(): MetadataRoute.Robots {
         ],
       },
     ],
+    sitemap: undefined,
   };
 }

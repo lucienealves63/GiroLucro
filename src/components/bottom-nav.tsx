@@ -26,6 +26,9 @@ const HIDDEN_PREFIXES = [
   "/esqueci-senha",
   "/redefinir-senha",
   "/assinatura",
+  "/landing",
+  "/bem-vindo",
+  "/sobre",
 ];
 
 export function BottomNav() {
