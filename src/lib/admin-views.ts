@@ -61,6 +61,9 @@ function delta(current: number, prev: number): string {
   return `<span class="${cls}">${arrow} ${PCT.format(Math.abs(change * 100))}%</span> vs. período anterior`;
 }
 
+/** tokenQs chega com "?" — para URL que já tem query, precisa de "&". */
+const amp = (tokenQs: string): string => (tokenQs ? tokenQs.replace("?", "&") : "");
+
 const channelLabel = (raw: string): string =>
   (CHANNEL_LABELS as Record<string, string>)[raw] ?? raw;
 
@@ -81,6 +84,20 @@ function funnel(steps: { label: string; value: number; hint?: string }[]): strin
     .join("")}</div>`;
 }
 
+/** Aviso único quando as tabelas existem mas ainda não há visita nenhuma. */
+function noDataYet(r: Report, tokenQs: string): string {
+  const v = r.visits;
+  if (v && v.views > 0) return "";
+  return note(
+    "info",
+    "Nenhuma visita registrada no período",
+    `Assim que alguém abrir uma página o contador começa a subir sozinha. Para ver o painel populado agora (dados de mentira, fáceis de limpar depois), rode
+     <a href="/api/admin/demo-visits${esc(tokenQs)}&dias=30">/api/admin/demo-visits</a> e recarregue esta página
+     — e <a href="/api/admin/demo-visits?action=clear${tokenQs.startsWith("?") ? tokenQs.replace("?", "&") : ""}">este outro link</a> limpa a demonstração.
+     <div class="small" style="margin-top:6px">Se você acabou de abrir o app nesta aba, a visita já foi contada: veja o horário do último acesso abaixo.</div>`,
+  );
+}
+
 /* ------------------------------- 1. acessos -------------------------------- */
 
 export function viewVisits(r: Report, hrefFor: (days: number) => string, tokenQs = "?token=SEU_TOKEN"): string {
@@ -89,7 +106,9 @@ export function viewVisits(r: Report, hrefFor: (days: number) => string, tokenQs
     return setupNeeded(r, tokenQs);
   }
   const best = [...v.series].sort((a, b) => b.views - a.views)[0];
+  const noData = noDataYet(r, tokenQs);
   return `
+  ${noData}
   <div class="grid g4" style="margin-bottom:12px">
     ${kpi("Pessoas únicas", n(v.visitors), delta(v.visitors, v.prev.visitors))}
     ${kpi("Visitas (sessões)", n(v.sessions), delta(v.sessions, v.prev.sessions))}
@@ -161,6 +180,7 @@ export function viewPerformance(r: Report, tokenQs = "?token=SEU_TOKEN"): string
   const maxHour = Math.max(...v.hours.map((h) => h.views), 1);
   const peak = [...v.hours].sort((a, b) => b.views - a.views)[0];
   const bestWeekday = [...v.weekdays].sort((a, b) => b.avg - a.avg)[0];
+  const noData = noDataYet(r, tokenQs);
 
   const heat = `<div style="display:flex;gap:4px;align-items:flex-end;height:96px">
     ${v.hours
@@ -195,6 +215,7 @@ export function viewPerformance(r: Report, tokenQs = "?token=SEU_TOKEN"): string
   });
 
   return `
+  ${noData}
   <div class="grid g4" style="margin-bottom:12px">
     ${kpi("Média por dia", n(avgPerDay), `${n(v.series.length)} dias no intervalo`)}
     ${kpi("Últimos 7 dias", n(sum(last7)), weekDelta)}
@@ -309,7 +330,7 @@ export function viewSubscribers(r: Report, tokenQs = ""): string {
           ]),
         )
       : `<div class="empty"><b>Nenhuma conta criada ainda.</b>Compartilhe sua landing e as visitas/cadastros aparecem aqui automaticamente.</div>`,
-    `<a href="/api/admin/export?table=users${tokenQs}">exportar CSV</a>`,
+    `<a href="/api/admin/export?table=users${amp(tokenQs)}">exportar CSV</a>`,
   )}</div>
   `;
 }
@@ -419,6 +440,11 @@ export function setupNeeded(r: Report, tokenQs = "?token=SEU_TOKEN"): string {
   );
 }
 
+/** O aviso de setup aparece uma única vez por página. */
+export function tabRendersSetupCallout(tab: string): boolean {
+  return tab === "visitas" || tab === "desempenho" || tab === "contato";
+}
+
 export function viewDiagnostics(
   env: Record<string, { ok: boolean; detail: string }>,
   r: Report,
@@ -440,7 +466,7 @@ export function viewDiagnostics(
         <div class="row"><span class="name">Diagnóstico de pagamento</span><span></span><a class="btn" href="/api/admin/billing-status${esc(tokenQs)}">abrir ↗</a></div>
         <div class="row"><span class="name">Diagnóstico de e-mail</span><span></span><a class="btn" href="/api/admin/email-status${esc(tokenQs)}">abrir ↗</a></div>
         <div class="row"><span class="name">Gerar visitas de demonstração</span><span></span><a class="btn" href="/api/admin/demo-visits${esc(tokenQs)}&dias=30">rodar ↗</a></div>
-        <div class="row"><span class="name">Exportar acessos (CSV)</span><span></span><a class="btn" href="/api/admin/export?table=visits${esc(tokenQs)}">baixar ↗</a></div>
+        <div class="row"><span class="name">Exportar acessos (CSV)</span><span></span><a class="btn" href="/api/admin/export?table=visits${esc(amp(tokenQs))}">baixar ↗</a></div>
         <div class="row"><span class="name">Ver como JSON (integrações)</span><span></span><a class="btn" href="/admin?format=json">abrir ↗</a></div>
       </div>`,
     )}

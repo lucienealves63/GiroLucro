@@ -13,6 +13,7 @@ import { esc, layout, loginPage } from "@/lib/admin-html";
 import { buildReport, reportJson, type Report } from "@/lib/admin-report";
 import {
   setupNeeded,
+  tabRendersSetupCallout,
   viewContact,
   viewDiagnostics,
   viewPerformance,
@@ -147,7 +148,10 @@ export async function GET(req: Request) {
 
   const report = await buildReport(days);
   const tokenRaw = url.searchParams.get("token");
-  const tokenQs = tokenRaw ? `?token=${encodeURIComponent(tokenRaw)}` : "";
+  // links que saem do painel para /api/admin/* exigem o token na query (essas
+  // rotas não leem cookie). Sem token na URL, mantemos o placeholder p/ colar.
+  const linkTokenQs = tokenRaw ? `?token=${encodeURIComponent(tokenRaw)}` : "?token=SEU_TOKEN";
+  const tokenQs = linkTokenQs;
   const suffix = tokenRaw ? `&token=${encodeURIComponent(tokenRaw)}` : "";
   const hrefFor = (d: number) => `/admin?aba=${tab}&dias=${d}${suffix}`;
   const flash = url.searchParams.get("ok");
@@ -166,7 +170,9 @@ export async function GET(req: Request) {
                   : "Feito.",
         )
       : "") +
-    (report.problems.length && tab !== "diagnostico" ? setupNeeded(report, tokenQs) : "") +
+    (report.problems.length && tab !== "diagnostico" && !tabRendersSetupCallout(tab)
+      ? setupNeeded(report, tokenQs)
+      : "") +
     (tab === "visitas"
       ? viewVisits(report, hrefFor, tokenQs)
       : tab === "desempenho"
