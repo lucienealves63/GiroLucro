@@ -5,9 +5,19 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: "*",
-        allow: ["/", "/landing", "/bem-vindo", "/sobre", "/entrar", "/criar-conta", "/esqueci-senha"],
+        allow: [
+          "/",
+          "/landing",
+          "/bem-vindo",
+          "/sobre",
+          "/entrar",
+          "/criar-conta",
+          "/esqueci-senha",
+          "/contato",
+        ],
         disallow: [
           "/api",
+          "/admin",
           "/redefinir-senha",
           "/comparar",
           "/metas",

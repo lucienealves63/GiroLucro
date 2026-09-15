@@ -20,6 +20,9 @@
 - **Calculadora "vale a pena?"** — julga uma corrida/entrega pela sua média real
 - **SaaS completo** — cadastro/login (scrypt + sessões), trial de 7 dias, paywall e
   assinaturas mensal/anual (ponto de integração Mercado Pago/Stripe documentado)
+- **Painel do dono** (`/admin`) — acessos, desempenho das visitas, assinantes/conversão
+  e a caixa de entrada do `/contato`. Medição própria, sem Google Analytics, sem
+  cookie de terceiros → [PAINEL_ACESSOS.md](./PAINEL_ACESSOS.md)
 
 ## Stack
 
@@ -60,6 +63,16 @@ Com terminal:
 3. Crie as tabelas abrindo um link: `https://SEU-APP.vercel.app/api/admin/setup?token=SEU_TOKEN`
    (ou, se preferir terminal: `DATABASE_URL="<url>" npx drizzle-kit push`)
 4. Pronto — HTTPS, domínio `.vercel.app` e deploy automático a cada push
+
+## Painel de acessos, assinantes e contato
+
+- `/admin` → abas **Acessos**, **Desempenho das visitas**, **Assinantes**, **Contato**,
+  **Diagnóstico** (protegido pelo mesmo `ADMIN_SETUP_TOKEN` do setup)
+- `/contato` → formulário público; a mensagem é salva no banco e, se houver
+  `RESEND_API_KEY`, vira cópia por e-mail
+- depois de publicar este código, abra **uma vez** `/api/admin/setup?token=SEU_TOKEN`
+  para criar as tabelas `page_views` e `contact_messages`
+- guia completo: [PAINEL_ACESSOS.md](./PAINEL_ACESSOS.md)
 
 ## Pagamentos
 

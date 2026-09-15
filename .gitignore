@@ -1,3 +1,11 @@
 # misc
 .DS_Store
 *.tsbuildinfo
+
+# locais de desenvolvimento
+.env
+.env*.local
+
+# build / dependências
+.next/
+node_modules/

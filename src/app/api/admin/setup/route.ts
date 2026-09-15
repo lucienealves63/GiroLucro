@@ -44,6 +44,29 @@ const STATEMENTS: SetupStatement[] = [
     )`,
   },
   {
+    name: "contact_messages",
+    kind: "table",
+    sql: `CREATE TABLE IF NOT EXISTS "contact_messages" (
+      "id" serial PRIMARY KEY NOT NULL,
+      "name" text NOT NULL,
+      "email" text NOT NULL,
+      "phone" text,
+      "topic" text DEFAULT 'duvida' NOT NULL,
+      "body" text NOT NULL,
+      "status" text DEFAULT 'novo' NOT NULL,
+      "user_id" integer,
+      "visitor_id" text,
+      "source_path" text,
+      "reply_to_email" boolean DEFAULT false NOT NULL,
+      "ip_hash" text,
+      "user_agent" text,
+      "email_sent" boolean DEFAULT false NOT NULL,
+      "email_error" text,
+      "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+      "answered_at" timestamp with time zone
+    )`,
+  },
+  {
     name: "expenses",
     kind: "table",
     sql: `CREATE TABLE IF NOT EXISTS "expenses" (
@@ -83,6 +106,32 @@ const STATEMENTS: SetupStatement[] = [
       "body" text NOT NULL,
       "sent_at" timestamp with time zone DEFAULT now() NOT NULL,
       "opened" boolean DEFAULT false NOT NULL
+    )`,
+  },
+  {
+    name: "page_views",
+    kind: "table",
+    sql: `CREATE TABLE IF NOT EXISTS "page_views" (
+      "id" serial PRIMARY KEY NOT NULL,
+      "visitor_id" text NOT NULL,
+      "session_id" text NOT NULL,
+      "path" text NOT NULL,
+      "referrer" text,
+      "referrer_domain" text,
+      "channel" text DEFAULT 'direto' NOT NULL,
+      "source" text,
+      "medium" text,
+      "campaign" text,
+      "device_type" text DEFAULT 'desktop' NOT NULL,
+      "browser" text,
+      "os" text,
+      "country" text,
+      "language" text,
+      "user_id" integer,
+      "dwell_ms" integer DEFAULT 0 NOT NULL,
+      "is_bot" boolean DEFAULT false NOT NULL,
+      "day" text NOT NULL,
+      "created_at" timestamp with time zone DEFAULT now() NOT NULL
     )`,
   },
   {
@@ -198,6 +247,42 @@ const STATEMENTS: SetupStatement[] = [
     kind: "index",
     sql: `CREATE UNIQUE INDEX IF NOT EXISTS "billing_events_provider_key_idx" ON "billing_events" USING btree ("provider", "event_key")`,
   },
+  // Índices do painel de acessos / contato (mesma ordem das tabelas acima)
+  {
+    name: "page_views_day_idx",
+    kind: "index",
+    sql: `CREATE INDEX IF NOT EXISTS "page_views_day_idx" ON "page_views" USING btree ("day")`,
+  },
+  {
+    name: "page_views_created_idx",
+    kind: "index",
+    sql: `CREATE INDEX IF NOT EXISTS "page_views_created_idx" ON "page_views" USING btree ("created_at")`,
+  },
+  {
+    name: "page_views_visitor_day_idx",
+    kind: "index",
+    sql: `CREATE INDEX IF NOT EXISTS "page_views_visitor_day_idx" ON "page_views" USING btree ("visitor_id", "day")`,
+  },
+  {
+    name: "page_views_user_idx",
+    kind: "index",
+    sql: `CREATE INDEX IF NOT EXISTS "page_views_user_idx" ON "page_views" USING btree ("user_id")`,
+  },
+  {
+    name: "contact_messages_created_idx",
+    kind: "index",
+    sql: `CREATE INDEX IF NOT EXISTS "contact_messages_created_idx" ON "contact_messages" USING btree ("created_at")`,
+  },
+  {
+    name: "contact_messages_status_idx",
+    kind: "index",
+    sql: `CREATE INDEX IF NOT EXISTS "contact_messages_status_idx" ON "contact_messages" USING btree ("status")`,
+  },
+  {
+    name: "contact_messages_ip_idx",
+    kind: "index",
+    sql: `CREATE INDEX IF NOT EXISTS "contact_messages_ip_idx" ON "contact_messages" USING btree ("ip_hash", "created_at")`,
+  },
   // Migration: bancos antigos (tabela settings já existia sem a coluna)
   {
     name: "settings.platforms_json",
@@ -287,6 +372,8 @@ function page(title: string, rows: string, ok: boolean): string {
       variáveis de ambiente — assim ninguém mais roda este setup.
       Cada tabela/coluna já é criada com segurança: rodar duas vezes não tem problema.
       A coluna <code>settings.platforms_json</code> habilita apps personalizados.
+      As tabelas <code>page_views</code> e <code>contact_messages</code> ligam o painel de acessos
+      (<code>/admin</code>) e o formulário de contato (<code>/contato</code>).
     </p>
   </div>
 </body>

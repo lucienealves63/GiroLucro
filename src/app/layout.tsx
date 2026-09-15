@@ -6,6 +6,7 @@ import { BottomNav } from "@/components/bottom-nav";
 import { ServiceWorkerRegister } from "@/components/sw-register";
 import { NotificationPrompt } from "@/components/notification-prompt";
 import { ThemeProvider } from "@/components/theme-provider";
+import { VisitTracker } from "@/components/visit-tracker";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -86,6 +87,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <BottomNav />
             <ServiceWorkerRegister />
             <NotificationPrompt />
+            <VisitTracker />
           </div>
         </ThemeProvider>
       </body>
