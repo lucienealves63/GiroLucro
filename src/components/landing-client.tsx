@@ -706,6 +706,9 @@ export function LandingClient({ isLogged }: LandingProps) {
               <Link href="/criar-conta" className="hover:text-zinc-300">
                 Criar conta
               </Link>
+              <Link href="/contato" className="hover:text-zinc-300">
+                Contato
+              </Link>
               <span className="flex items-center gap-1.5">
                 <BadgeCheck className="h-3.5 w-3.5 text-volt-400" /> R$19,90 vitalício
               </span>

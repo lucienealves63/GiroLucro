@@ -1,5 +1,6 @@
 import {
   boolean,
+  index,
   integer,
   numeric,
   pgTable,
@@ -237,3 +238,82 @@ export const notificationLogs = pgTable("notification_logs", {
   sentAt: timestamp("sent_at", { withTimezone: true }).defaultNow().notNull(),
   opened: boolean("opened").notNull().default(false),
 });
+
+/**
+ * Visitas às páginas públicas e do app (base do painel de acessos).
+ *
+ * Não guardamos IP nem cookies de terceiros: o identificador é um UUID
+ * de primeiro domínio (`gl_vid`) gerado no próprio navegador do visitante.
+ * `day` é gravado já no fuso de São Paulo para os gráficos fecharem com o
+ * dia "de calendário" do dono do app (e não depender do fuso do servidor).
+ */
+export const pageViews = pgTable(
+  "page_views",
+  {
+    id: serial("id").primaryKey(),
+    visitorId: text("visitor_id").notNull(),
+    sessionId: text("session_id").notNull(), // uma aba/janela = uma visita
+    path: text("path").notNull(), // "/comparar" (sem query string)
+    referrer: text("referrer"), // URL de origem, truncada
+    referrerDomain: text("referrer_domain"), // "google.com.br" | null = acesso direto
+    channel: text("channel").notNull().default("direto"), // direto | busca | social | anuncio | email | referencia | interno
+    source: text("source"), // utm_source
+    medium: text("medium"), // utm_medium
+    campaign: text("campaign"), // utm_campaign
+    deviceType: text("device_type").notNull().default("desktop"), // mobile | tablet | desktop
+    browser: text("browser"),
+    os: text("os"),
+    country: text("country"), // ISO-2 (x-vercel-ip-country)
+    language: text("language"), // Accept-Language
+    userId: integer("user_id"), // preenchido quando o visitante já tem sessão
+    dwellMs: integer("dwell_ms").notNull().default(0), // tempo na página (beacon de saída)
+    isBot: boolean("is_bot").notNull().default(false),
+    day: text("day").notNull(), // yyyy-MM-dd em America/Sao_Paulo
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("page_views_day_idx").on(t.day),
+    index("page_views_created_idx").on(t.createdAt),
+    index("page_views_visitor_day_idx").on(t.visitorId, t.day),
+    index("page_views_user_idx").on(t.userId),
+  ],
+);
+
+export type PageView = typeof pageViews.$inferSelect;
+
+/**
+ * Mensagens recebidas pela página de contato (/contato).
+ *
+ * Sempre são gravadas no banco — o e-mail via Resend é uma cópia. Assim,
+ * mesmo sem RESEND_API_KEY configurada a mensagem não se perde
+ * (dá para ler tudo no painel em /admin?aba=contato).
+ */
+export const contactMessages = pgTable(
+  "contact_messages",
+  {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull(),
+    email: text("email").notNull(),
+    phone: text("phone"),
+    topic: text("topic").notNull().default("duvida"), // duvida | bug | pagamento | parceria | outro
+    body: text("body").notNull(),
+    status: text("status").notNull().default("novo"), // novo | respondido | arquivado
+    userId: integer("user_id"), // autor logado, se houver
+    visitorId: text("visitor_id"), // liga a mensagem às visitas da pessoa
+    sourcePath: text("source_path"), // página de onde a pessoa escreveu
+    replyToEmail: boolean("reply_to_email").notNull().default(false), // quer resposta por e-mail
+    ipHash: text("ip_hash"), // hash do IP — usado só para rate limit
+    userAgent: text("user_agent"),
+    emailSent: boolean("email_sent").notNull().default(false),
+    emailError: text("email_error"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    answeredAt: timestamp("answered_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("contact_messages_created_idx").on(t.createdAt),
+    index("contact_messages_status_idx").on(t.status),
+    index("contact_messages_ip_idx").on(t.ipHash, t.createdAt),
+  ],
+);
+
+export type ContactMessage = typeof contactMessages.$inferSelect;

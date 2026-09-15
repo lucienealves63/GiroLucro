@@ -13,6 +13,7 @@ import {
   EyeOff,
   Fuel,
   Gauge,
+  LifeBuoy,
   LogOut,
   Moon,
   Plus,
@@ -253,10 +254,17 @@ export function SettingsClient({
                 </Link>
               )}
             </div>
+            <Link
+              href="/contato"
+              className="pressable mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.03] py-3 text-[13px] font-bold text-zinc-300"
+            >
+              <LifeBuoy className="h-4 w-4 text-volt-400" />
+              Falar com o suporte
+            </Link>
             <button
               onClick={logout}
               disabled={pending}
-              className="pressable mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.03] py-3 text-[13px] font-bold text-zinc-300 disabled:opacity-50"
+              className="pressable mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.03] py-3 text-[13px] font-bold text-zinc-300 disabled:opacity-50"
             >
               <LogOut className="h-4 w-4" />
               Sair da conta

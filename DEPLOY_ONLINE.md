@@ -52,8 +52,12 @@ https://girolucro-xxxx.vercel.app/api/admin/setup?token=meu-sitio-123
 
 (use o token que você definiu em `ADMIN_SETUP_TOKEN`)
 
-Você verá uma tela bonita listando cada tabela criada:
-**"Setup concluído! 8 criada(s)"** → clique em **"Criar minha conta de administrador"**.
+Você verá uma tela bonita listando cada tabela criada, incluindo
+`page_views` (visitas) e `contact_messages` (contato) → clique em
+**"Criar minha conta de administrador"**.
+
+> ⏫ **Atualizou o código depois?** Abra este mesmo link de novo: ele cria as
+> tabelas novas sem mexer no que já existe.
 
 ## Passo 5 — Sua conta e pronto!
 
@@ -67,10 +71,22 @@ Quando quiser mudar o app:
 - Edite qualquer arquivo **direto no GitHub** (ícone de lápis em cima do arquivo) → Commit
 - A Vercel **republica automaticamente** a cada alteração
 
+## Passo 6 — Painel de acessos e contato (opcional, 1 minuto)
+
+1. Abra `https://girolucro-xxxx.vercel.app/admin?token=meu-sitio-123`
+   → é o painel de acessos, desempenho das visitas, assinantes e mensagens
+2. Quer ver o painel funcionando na hora, sem esperar tráfego? Abra
+   `https://girolucro-xxxx.vercel.app/api/admin/demo-visits?token=meu-sitio-123`
+   e depois `...?token=meu-sitio-123&action=clear` para limpar a demonstração
+3. O formulário público fica em `https://girolucro-xxxx.vercel.app/contato`
+   (as mensagens aparecem na aba **Contato** do painel; e-mail de cópia é opcional)
+
+Detalhes em [PAINEL_ACESSOS.md](./PAINEL_ACESSOS.md).
+
 ## Segurança — lembre-se
 
 - Mude `ADMIN_SETUP_TOKEN` para algo só seu (sem isso, qualquer pessoa pode
-  executar o setup — embora ele não apague nada, só criar tabelas)
+  executar o setup e **ler o painel `/admin`** — visitas, cadastros e mensagens)
 - Enquanto pagamentos estiverem sem `MERCADO_PAGO_ACCESS_TOKEN`, o checkout em
   produção retorna **erro 503** (billing não configurado) — ele **não** ativa o
   plano demo grátis no deploy online. Configure o token do MP antes de abrir as
