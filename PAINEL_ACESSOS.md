@@ -8,7 +8,7 @@ ficam no seu banco (Neon/Vercel Postgres) e a leitura é no navegador, pelo link
 
 | Endereço | O que é |
 | --- | --- |
-| `/admin` | Painel com 5 abas: **Acessos**, **Desempenho das visitas**, **Assinantes**, **Contato**, **Diagnóstico** |
+| `/admin` | Painel com 6 abas: **Acessos**, **Desempenho das visitas**, **Pagantes**, **Pedidos**, **Contato**, **Diagnóstico** |
 | `/contato` | Página pública de contato (suporte, bug, pagamento, ideia) |
 | `/api/visit` | Coleta de visitas (chamada pelo próprio app) |
 | `/api/contact` | Recebe o formulário de contato |
@@ -53,10 +53,10 @@ contra os 7 anteriores, tempo médio na página, taxa de salto, mapa de horário
 página × desempenho (participação, pessoas, tempo médio) e por onde as pessoas
 começam e abandonam.
 
-**Assinantes** — contas criadas, em teste, pagantes, recebido, funil
-*visita → conta → teste → pago*, situação das assinaturas, cadastros por dia,
-qual canal/página traz assinante e a lista dos últimos cadastros com a origem
-de cada um.
+**Pagantes** — contas criadas, em teste, pagantes, recebido, funil
+*visita → conta → teste → pago*, situação do acesso (ativo, encerrado, aguardando
+pagamento), cadastros por dia, qual canal/página traz pagante e a lista dos últimos
+cadastros com a origem de cada um.
 
 **Pedidos** — a fila de **reembolsos** e as **solicitações de titular (LGPD)**.
 Quando o reembolso não pôde ser automático (pedido fora do prazo de 7 dias,

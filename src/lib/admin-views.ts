@@ -3,7 +3,7 @@ import { barRows, card, esc, kpi, note, table, visitsChart } from "@/lib/admin-h
 import type { NamedCount, Report } from "@/lib/admin-report";
 
 /**
- * As quatro telas do painel /admin (acessos, desempenho, assinantes, contato).
+ * As telas do painel /admin (acessos, desempenho, assinantes, pedidos, contato).
  * Renderizam HTML a partir do `Report` – sem JavaScript no navegador.
  */
 
@@ -289,11 +289,11 @@ export function viewSubscribers(r: Report, tokenQs = ""): string {
           : ""),
     )}
     ${card(
-      "Situação das assinaturas",
+      "Situação do acesso",
       barRows(s.byStatus) +
-        `<p class="small" style="margin-top:10px">${n(s.canceled)} canceladas · ${n(
+        `<p class="small" style="margin-top:10px">${n(s.canceled)} acessos encerrados · ${n(
           s.activeLast7,
-        )} assinantes abriram o app nos últimos 7 dias</p>`,
+        )} pagantes abriram o app nos últimos 7 dias</p>`,
     )}
   </div>
 
@@ -306,7 +306,7 @@ export function viewSubscribers(r: Report, tokenQs = ""): string {
   )}
 
   <div class="grid g2" style="margin-top:12px">
-    ${card("Qual canal traz assinante", barRows(
+    ${card("Qual canal traz pagante", barRows(
       relabelChannels(s.attribution).map((a) => ({ ...a, hint: a.hint })),
       "Sem sessão de visita vinculada ainda.",
     ))}

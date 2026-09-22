@@ -71,9 +71,9 @@ Com terminal:
 > pós-venda). O agendador interno do app já roda as duas rotinas quando está em
 > produção; veja `PRIVACIDADE_LGPD.md`.
 
-## Painel de acessos, assinantes e contato
+## Painel de acessos, pagantes e contato
 
-- `/admin` → abas **Acessos**, **Desempenho das visitas**, **Assinantes**, **Pedidos**
+- `/admin` → abas **Acessos**, **Desempenho das visitas**, **Pagantes**, **Pedidos**
   (fila de reembolso + solicitações de titular), **Contato**, **Diagnóstico**
   (protegido pelo mesmo `ADMIN_SETUP_TOKEN` do setup)
 - `/contato` → formulário público; a mensagem é salva no banco e, se houver

@@ -29,7 +29,7 @@ import { getAppUrl, getAppUrlSource } from "@/lib/password-reset";
 export const dynamic = "force-dynamic";
 
 /**
- * Painel do dono do GiroLucro: acessos, desempenho das visitas, assinantes
+ * Painel do dono do GiroLucro: acessos, desempenho das visitas, pagantes
  * e a caixa de entrada de /contato.
  *
  *   https://SEU-DOMINIO/admin            → pede o token uma vez por dia
@@ -43,7 +43,7 @@ export const dynamic = "force-dynamic";
 const TABS = [
   { id: "visitas", label: "Acessos" },
   { id: "desempenho", label: "Desempenho das visitas" },
-  { id: "assinantes", label: "Assinantes" },
+  { id: "assinantes", label: "Pagantes" },
   { id: "pedidos", label: "Pedidos" },
   { id: "contato", label: "Contato" },
   { id: "diagnostico", label: "Diagnóstico" },
@@ -54,7 +54,7 @@ type TabId = (typeof TABS)[number]["id"];
 const TITLE: Record<TabId, string> = {
   visitas: "Acessos e visitantes",
   desempenho: "Desempenho das visitas",
-  assinantes: "Assinantes e conversão",
+  assinantes: "Pagantes e conversão",
   pedidos: "Reembolsos e solicitações de titular",
   contato: "Mensagens de contato",
   diagnostico: "Diagnóstico do painel",

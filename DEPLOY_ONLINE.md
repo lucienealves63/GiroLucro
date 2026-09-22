@@ -36,9 +36,17 @@ Pronto — código no GitHub sem nunca abrir um terminal.
    | `ADMIN_SETUP_TOKEN` | (senha que você inventar, ex: `meu-sitio-123`) |
 
    > Para o produto completo, adicione depois:
-   > `MERCADO_PAGO_ACCESS_TOKEN` (pagamentos),
-   > `RESEND_API_KEY`, `EMAIL_FROM` e `APP_URL` (recuperação de senha por e-mail),
-   > `NEXT_PUBLIC_VAPID_PUBLIC_KEY` + `VAPID_PRIVATE_KEY` (push notifications).
+   > `APP_URL` (endereço definitivo do app — usado no retorno do checkout e nos e-mails),
+   > `MERCADO_PAGO_ACCESS_TOKEN` + `MERCADO_PAGO_WEBHOOK_SECRET` (compra do Pro:
+   > pagamento único de R$ 19,90 por Pix ou cartão),
+   > `RESEND_API_KEY`, `EMAIL_FROM` e `CONTACT_TO_EMAIL` (recuperação de senha,
+   > recibo da compra e formulário de contato),
+   > `NEXT_PUBLIC_VAPID_PUBLIC_KEY` + `VAPID_PRIVATE_KEY` (push notifications),
+   > `CRON_SECRET` (rotinas de limpeza de dados e lembretes de reembolso).
+   >
+   > O passo a passo de cada uma está em `MERCADO_PAGO_SETUP.md`,
+   > `RECUPERACAO_SENHA_SETUP.md`, `PUSH_NOTIFICATIONS_SETUP.md` e
+   > `PRIVACIDADE_LGPD.md`. Todas também estão listadas em `.env.example`.
 
 4. Clique **"Deploy"** → aguarde ~1 minuto → site no ar em `https://girolucro-xxxx.vercel.app`
 
@@ -53,8 +61,9 @@ https://girolucro-xxxx.vercel.app/api/admin/setup?token=meu-sitio-123
 (use o token que você definiu em `ADMIN_SETUP_TOKEN`)
 
 Você verá uma tela bonita listando cada tabela criada, incluindo
-`page_views` (visitas) e `contact_messages` (contato) → clique em
-**"Criar minha conta de administrador"**.
+`page_views` (visitas), `contact_messages` (contato), `legal_acceptances`
+(histórico de aceite dos Termos e da Privacidade) e `data_subject_requests`
+(solicitações de titular) → clique em **"Criar minha conta de administrador"**.
 
 > ⏫ **Atualizou o código depois?** Abra este mesmo link de novo: ele cria as
 > tabelas novas sem mexer no que já existe.
