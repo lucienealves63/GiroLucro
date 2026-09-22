@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Bem-vindo ao GiroLucro — Lucro real na pista",
   description:
-    "Descubra seu lucro líquido real por hora e por km. Batalha dos Apps compara Uber, 99, iFood, Rappi. 7 dias grátis, R$19,90 vitalício.",
+    "Descubra seu lucro líquido real por hora e por km. Batalha dos Apps compara Uber, 99, iFood, Rappi. 7 dias grátis, R$ 19,90 em pagamento único, sem mensalidade.",
 };
 
 export default async function BemVindoPage() {

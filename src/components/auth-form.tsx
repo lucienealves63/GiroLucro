@@ -4,8 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, CircleAlert, Loader2, Lock, Mail, User } from "lucide-react";
+import { ArrowRight, Check, CircleAlert, Loader2, Lock, Mail, User } from "lucide-react";
+import clsx from "clsx";
 import { Logo } from "@/components/brand";
+import { PRIVACY_DOC, TERMS_DOC } from "@/lib/legal";
 
 export function AuthForm({
   mode,
@@ -21,15 +23,27 @@ export function AuthForm({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // Aceite dos documentos: começa SEMPRE desmarcado (não pode ser pré-marcado).
+  const [accepted, setAccepted] = useState(false);
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    if (isRegister && !accepted) {
+      setError("Marque a caixa aceitando os Termos de Uso e a Política de Privacidade para criar a conta.");
+      return;
+    }
     start(async () => {
       const res = await fetch(`/api/auth/${isRegister ? "register" : "login"}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+          // o servidor também recusa o cadastro sem este campo
+          acceptedTermsAndPrivacy: isRegister ? accepted : undefined,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
@@ -137,9 +151,56 @@ export function AuthForm({
           </p>
         )}
 
+        {isRegister && (
+          <div className="rounded-2xl border border-white/[0.09] bg-white/[0.03] px-4 py-3.5">
+            <div className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                id="aceite-termos"
+                checked={accepted}
+                onChange={(e) => {
+                  setAccepted(e.target.checked);
+                  if (e.target.checked) setError(null);
+                }}
+                aria-describedby="aceite-termos-ajuda"
+                className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer rounded-md border border-white/25 bg-white/[0.06] accent-[#b8f53c]"
+              />
+              <label
+                htmlFor="aceite-termos"
+                className="cursor-pointer text-[12.5px] leading-relaxed text-zinc-300"
+              >
+                Li e aceito os{" "}
+                <Link
+                  href="/termos"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-bold text-volt-400 underline underline-offset-4"
+                >
+                  Termos de Uso
+                </Link>{" "}
+                e a{" "}
+                <Link
+                  href="/privacidade"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-bold text-volt-400 underline underline-offset-4"
+                >
+                  Política de Privacidade
+                </Link>
+                .
+              </label>
+            </div>
+            <p id="aceite-termos-ajuda" className="mt-2 text-[11px] leading-relaxed text-zinc-500">
+              {TERMS_DOC.versionLabel} · {PRIVACY_DOC.versionLabel}. Registramos a versão aceita e a
+              data/hora do aceite. Sem o aceite, a conta não é criada.
+            </p>
+          </div>
+        )}
+
         <AnimatePresence>
           {error && (
             <motion.p
+              role="alert"
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
@@ -153,13 +214,19 @@ export function AuthForm({
 
         <button
           type="submit"
-          disabled={pending}
-          className="pressable mt-2 flex items-center justify-center gap-2 rounded-2xl bg-volt-400 py-4 font-display text-[15.5px] font-bold text-ink-950 disabled:opacity-50"
+          disabled={pending || (isRegister && !accepted)}
+          aria-disabled={pending || (isRegister && !accepted)}
+          className={clsx(
+            "pressable mt-2 flex items-center justify-center gap-2 rounded-2xl py-4 font-display text-[15.5px] font-bold text-ink-950",
+            "bg-volt-400 disabled:opacity-50",
+          )}
         >
           {pending ? (
-            <Loader2 className="h-5 w-5 animate-spin" />
+            <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+          ) : isRegister ? (
+            <Check className="h-5 w-5" strokeWidth={3} aria-hidden="true" />
           ) : (
-            <ArrowRight className="h-5 w-5" strokeWidth={2.6} />
+            <ArrowRight className="h-5 w-5" strokeWidth={2.6} aria-hidden="true" />
           )}
           {pending ? "Um momento..." : isRegister ? "Criar minha conta grátis" : "Entrar"}
         </button>
@@ -186,9 +253,34 @@ export function AuthForm({
             </Link>
           </p>
         )}
-        <p className="mt-4 text-[10.5px] leading-relaxed text-zinc-600">
-          Ao continuar você concorda com os termos de uso. Seus dados são só seus —
-          nada é compartilhado com as plataformas.
+        <p className="mt-4 text-[10.5px] leading-relaxed text-zinc-500">
+          {isRegister ? (
+            <>
+              Ao criar a conta você confirma o aceite dos{" "}
+              <Link href="/termos" className="font-bold text-zinc-300 underline underline-offset-4">
+                Termos de Uso
+              </Link>{" "}
+              e da{" "}
+              <Link
+                href="/privacidade"
+                className="font-bold text-zinc-300 underline underline-offset-4"
+              >
+                Política de Privacidade
+              </Link>
+              .
+            </>
+          ) : (
+            <>
+              Seus dados são só seus — nada é compartilhado com as plataformas. Veja a{" "}
+              <Link
+                href="/privacidade"
+                className="font-bold text-zinc-300 underline underline-offset-4"
+              >
+                Política de Privacidade
+              </Link>
+              .
+            </>
+          )}
         </p>
       </motion.div>
     </div>

@@ -73,7 +73,16 @@ async function findValidatedContext(subscription: MercadoPagoSubscription) {
   return { user, plan };
 }
 
-async function activateLifetime(userId: number, eventId: number) {
+async function activateLifetime(
+  userId: number,
+  eventId: number,
+  payment?: {
+    id: string | number;
+    provider: string;
+    amount?: number;
+    paidAt?: Date;
+  },
+) {
   const currentPeriodEnd = new Date(Date.now() + DEFAULT_PLAN.days * 86400000);
   await db.transaction(async (tx) => {
     await tx
@@ -82,6 +91,16 @@ async function activateLifetime(userId: number, eventId: number) {
         planStatus: "active",
         planCycle: "lifetime",
         currentPeriodEnd,
+        // Registro comercial da compra (recibo, reembolso e guarda fiscal).
+        ...(payment
+          ? {
+              paymentId: String(payment.id),
+              paymentProvider: payment.provider,
+              paidAt: payment.paidAt ?? new Date(),
+              ...(Number.isFinite(payment.amount) ? { paymentAmount: payment.amount } : {}),
+              paymentStatus: "approved",
+            }
+          : {}),
       })
       .where(eq(users.id, userId));
     await tx
@@ -186,14 +205,40 @@ export async function POST(req: Request) {
       const validCurrency = String(payment.currency_id ?? "").toUpperCase() === "BRL";
       const payApproved = payment.status === "approved";
 
-      // Pix à vista ou Checkout Pro (pagamento único vitalício)
+      // Pix à vista ou Checkout Pro (pagamento único)
       const isPix = referencedUser.billingCustomerId === `pix:${String(payment.id)}`;
       const isPreference = referencedUser.billingCustomerId?.startsWith("pref:") ?? false;
       const isLifetimeRef = reference.cycle === "lifetime";
 
       if (isPix || isPreference || isLifetimeRef) {
+        // Estorno / chargeback avisado pelo provedor: mantém o histórico em dia
+        // (reembolso pedido pela própria pessoa é tratado em /api/billing/refund).
+        if (payment.status === "refunded" || payment.status === "charged_back") {
+          await db
+            .update(users)
+            .set({
+              paymentStatus: payment.status,
+              refundStatus: "refunded",
+              refundedAt: new Date(),
+              planStatus: "canceled",
+              currentPeriodEnd: null,
+            })
+            .where(eq(users.id, referencedUser.id));
+          await db
+            .update(billingEvents)
+            .set({ userId: referencedUser.id, status: "processed" })
+            .where(eq(billingEvents.id, claimed.id));
+          return NextResponse.json({ ok: true, refunded: true });
+        }
+
         if (payApproved && validAmount && validCurrency) {
-          await activateLifetime(referencedUser.id, claimed.id);
+          const paidAt = payment.date_approved ?? payment.date_created;
+          await activateLifetime(referencedUser.id, claimed.id, {
+            id: payment.id,
+            provider: "mercado_pago",
+            amount: payAmount,
+            paidAt: paidAt ? new Date(paidAt) : new Date(),
+          });
           if (!referencedUser.billingCustomerId?.startsWith("pix:")) {
             await db
               .update(users)
@@ -269,8 +314,13 @@ export async function POST(req: Request) {
     }
 
     if (paymentApproved) {
-      // Mesmo em assinaturas legadas, promove para lifetime com o preço atual
-      await activateLifetime(user.id, claimed.id);
+      // Mesmo em assinaturas legadas, promove para o acesso atual com o preço vigente
+      await activateLifetime(user.id, claimed.id, {
+        id: resourceId, // id do pagamento no Mercado Pago
+        provider: "mercado_pago",
+        amount: chargedAmount,
+        paidAt: chargeDate ? new Date(chargeDate) : new Date(),
+      });
       return NextResponse.json({ ok: true, activated: true });
     }
 

@@ -206,6 +206,19 @@ const STATEMENTS: SetupStatement[] = [
       "trial_ends_at" timestamp with time zone,
       "current_period_end" timestamp with time zone,
       "billing_customer_id" text,
+      "terms_accepted_at" timestamp with time zone,
+      "terms_version" text,
+      "privacy_accepted_at" timestamp with time zone,
+      "privacy_version" text,
+      "payment_id" text,
+      "payment_provider" text,
+      "paid_at" timestamp with time zone,
+      "payment_amount" numeric(10, 2),
+      "payment_status" text,
+      "refund_requested_at" timestamp with time zone,
+      "refunded_at" timestamp with time zone,
+      "refund_status" text DEFAULT 'none',
+      "deleted_at" timestamp with time zone,
       "created_at" timestamp with time zone DEFAULT now() NOT NULL
     )`,
   },
@@ -225,6 +238,32 @@ const STATEMENTS: SetupStatement[] = [
       "settled" boolean DEFAULT false NOT NULL,
       "period" text DEFAULT 'tarde' NOT NULL,
       "created_at" timestamp with time zone DEFAULT now() NOT NULL
+    )`,
+  },
+  {
+    name: "legal_acceptances",
+    kind: "table",
+    sql: `CREATE TABLE IF NOT EXISTS "legal_acceptances" (
+      "id" serial PRIMARY KEY NOT NULL,
+      "user_id" integer NOT NULL,
+      "document_type" text NOT NULL,
+      "document_version" text NOT NULL,
+      "accepted_at" timestamp with time zone DEFAULT now() NOT NULL,
+      "source" text DEFAULT 'signup' NOT NULL
+    )`,
+  },
+  {
+    name: "data_subject_requests",
+    kind: "table",
+    sql: `CREATE TABLE IF NOT EXISTS "data_subject_requests" (
+      "id" serial PRIMARY KEY NOT NULL,
+      "user_id" integer,
+      "request_type" text NOT NULL,
+      "status" text DEFAULT 'received' NOT NULL,
+      "channel" text DEFAULT 'app' NOT NULL,
+      "note" text,
+      "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+      "completed_at" timestamp with time zone
     )`,
   },
   {
@@ -283,6 +322,26 @@ const STATEMENTS: SetupStatement[] = [
     kind: "index",
     sql: `CREATE INDEX IF NOT EXISTS "contact_messages_ip_idx" ON "contact_messages" USING btree ("ip_hash", "created_at")`,
   },
+  {
+    name: "legal_acceptances_user_idx",
+    kind: "index",
+    sql: `CREATE INDEX IF NOT EXISTS "legal_acceptances_user_idx" ON "legal_acceptances" USING btree ("user_id")`,
+  },
+  {
+    name: "legal_acceptances_doc_idx",
+    kind: "index",
+    sql: `CREATE INDEX IF NOT EXISTS "legal_acceptances_doc_idx" ON "legal_acceptances" USING btree ("document_type", "document_version")`,
+  },
+  {
+    name: "data_subject_requests_user_idx",
+    kind: "index",
+    sql: `CREATE INDEX IF NOT EXISTS "data_subject_requests_user_idx" ON "data_subject_requests" USING btree ("user_id")`,
+  },
+  {
+    name: "data_subject_requests_type_idx",
+    kind: "index",
+    sql: `CREATE INDEX IF NOT EXISTS "data_subject_requests_type_idx" ON "data_subject_requests" USING btree ("request_type", "created_at")`,
+  },
   // Migration: bancos antigos (tabela settings já existia sem a coluna)
   {
     name: "settings.platforms_json",
@@ -291,6 +350,30 @@ const STATEMENTS: SetupStatement[] = [
     column: "platforms_json",
     sql: `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "platforms_json" text`,
   },
+  // Migration LGPD/aceite/compras: colunas novas em `users`
+  ...(
+    [
+      ["terms_accepted_at", `timestamp with time zone`],
+      ["terms_version", `text`],
+      ["privacy_accepted_at", `timestamp with time zone`],
+      ["privacy_version", `text`],
+      ["payment_id", `text`],
+      ["payment_provider", `text`],
+      ["paid_at", `timestamp with time zone`],
+      ["payment_amount", `numeric(10, 2)`],
+      ["payment_status", `text`],
+      ["refund_requested_at", `timestamp with time zone`],
+      ["refunded_at", `timestamp with time zone`],
+      ["refund_status", `text DEFAULT 'none'`],
+      ["deleted_at", `timestamp with time zone`],
+    ] as const
+  ).map(([column, type]) => ({
+    name: `users.${column}`,
+    kind: "column" as const,
+    table: "users",
+    column,
+    sql: `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "${column}" ${type}`,
+  })),
 ];
 
 async function alreadyExists(st: SetupStatement): Promise<boolean> {

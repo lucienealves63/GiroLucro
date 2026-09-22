@@ -149,6 +149,63 @@ html[data-theme="light"] input[type="date"]::-webkit-calendar-picker-indicator {
   opacity: 0.7;
 }
 
+/* ------------------- acessibilidade (WCAG 2.1 AA) ------------------- */
+
+/* Foco visível em todos os controles: obrigatório para navegação por teclado.
+   Regras explícitas por elemento para vencer o `outline: none` dos inputs. */
+:root {
+  --gl-focus: #b8f53c;
+}
+
+html[data-theme="light"] {
+  --gl-focus: #3f6212;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--gl-focus);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* Contraste: os tons usados em textos pequenos (zinc-500/600) ficam mais
+   legíveis no tema escuro, chegando a >= 4.5:1 sobre o fundo do app. */
+html[data-theme="dark"] .text-zinc-500 {
+  color: #a1a1aa;
+}
+html[data-theme="dark"] .text-zinc-600,
+html[data-theme="dark"] .text-zinc-700 {
+  color: #8b8b93;
+}
+html[data-theme="dark"] .placeholder\:text-zinc-600::placeholder,
+html[data-theme="dark"] .placeholder\:text-zinc-700::placeholder {
+  color: #8b8b93;
+}
+
+/* Área de toque mínima de 44px nos controles principais (mobile-first). */
+.pressable {
+  min-height: 0;
+}
+
+/* Respeita quem pediu menos movimento no sistema. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 /* Segmented underline anim */
 .pressable {
   transition: transform 0.13s cubic-bezier(0.2, 0.8, 0.3, 1), opacity 0.13s ease, background-color 0.2s ease, border-color 0.2s ease;

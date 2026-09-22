@@ -94,6 +94,38 @@ export type ContactRow = {
   userId: number | null;
 };
 
+export type RefundRow = {
+  userId: number;
+  name: string;
+  email: string;
+  paymentId: string | null;
+  provider: string | null;
+  paymentStatus: string | null;
+  amount: number | null;
+  paidAt: string | null;
+  refundStatus: string | null;
+  requestedAt: string | null;
+  daysSincePurchase: number | null;
+  withinWindow: boolean;
+};
+
+export type DataRequestRow = {
+  id: number;
+  requestType: string;
+  status: string;
+  createdAt: string;
+  completedAt: string | null;
+};
+
+export type RequestReport = {
+  /** Pedidos de reembolso (fila manual + histórico recente). */
+  refunds: RefundRow[];
+  /** Quantos ainda dependem de ação da equipe. */
+  refundsPending: number;
+  /** Solicitações de titular registradas (LGPD). */
+  dataRequests: DataRequestRow[];
+};
+
 export type Report = {
   ok: boolean;
   problems: string[]; // avisos de setup (tabela faltando etc.)
@@ -101,6 +133,7 @@ export type Report = {
   visits: VisitReport | null;
   subscribers: SubscriberReport;
   contact: { unread: number; total: number; rows: ContactRow[] };
+  requests: RequestReport;
 };
 
 const int = (v: unknown): number => {
@@ -126,7 +159,7 @@ async function tableExists(name: string): Promise<boolean> {
   }
 }
 
-/** paid = assinatura ativa (vitalício tem current_period_end ~2100). */
+/** paid = acesso pago ativo (pagamento único tem current_period_end ~2100). */
 const PAID_SQL = `(u.plan_status IN ('active','canceled') AND u.current_period_end > now())`;
 
 export async function buildReport(days: number): Promise<Report> {
@@ -515,7 +548,7 @@ export async function buildReport(days: number): Promise<Report> {
         email: String(r.email ?? ""),
         createdDay: String(r.day ?? ""),
         statusLabel: isPaid
-          ? `Pro ${r.plan_cycle === "lifetime" ? "vitalício" : "ativo"}`
+          ? `Pro ${r.plan_cycle === "lifetime" ? "pagamento único" : "ativo"}`
           : isTrial
             ? "Em teste"
             : statusLabel(status),
@@ -572,6 +605,67 @@ export async function buildReport(days: number): Promise<Report> {
     };
   }
 
+  /* ---------------------- pedidos de reembolso e LGPD ---------------------- */
+
+  const requests: RequestReport = { refunds: [], refundsPending: 0, dataRequests: [] };
+  try {
+    const rows = await query(
+      `SELECT id, name, email, payment_id, payment_provider, payment_status, payment_amount,
+              paid_at, refund_status, refund_requested_at
+         FROM users
+        WHERE refund_status IS NOT NULL AND refund_status <> 'none'
+        ORDER BY (refund_status IN ('manual','requested','processing')) DESC,
+                 coalesce(refund_requested_at, paid_at) DESC NULLS LAST
+        LIMIT 60`,
+    );
+    requests.refunds = rows.map((r) => {
+      const paidAt = r.paid_at ? new Date(String(r.paid_at)) : null;
+      const status = r.refund_status ? String(r.refund_status) : null;
+      const days =
+        paidAt && Number.isFinite(paidAt.getTime())
+          ? Math.floor((Date.now() - paidAt.getTime()) / 86_400_000)
+          : null;
+      return {
+        userId: int(r.id),
+        name: String(r.name ?? ""),
+        email: String(r.email ?? ""),
+        paymentId: r.payment_id ? String(r.payment_id) : null,
+        provider: r.payment_provider ? String(r.payment_provider) : null,
+        paymentStatus: r.payment_status ? String(r.payment_status) : null,
+        amount: r.payment_amount === null ? null : flt(r.payment_amount),
+        paidAt: paidAt && Number.isFinite(paidAt.getTime()) ? paidAt.toISOString() : null,
+        refundStatus: status,
+        requestedAt: r.refund_requested_at ? new Date(String(r.refund_requested_at)).toISOString() : null,
+        daysSincePurchase: days,
+        withinWindow: days !== null && days <= 7,
+      };
+    });
+    requests.refundsPending = requests.refunds.filter((r) =>
+      r.refundStatus === "manual" || r.refundStatus === "requested" || r.refundStatus === "processing",
+    ).length;
+  } catch (e) {
+    // colunas novas ainda não migradas: o painel não pode quebrar por isso
+    console.warn("[admin] pedidos de reembolso indisponíveis:", e instanceof Error ? e.message : e);
+  }
+
+  if (await tableExists("data_subject_requests")) {
+    try {
+      const rows = await query(
+        `SELECT id, request_type, status, created_at, completed_at
+           FROM data_subject_requests ORDER BY created_at DESC LIMIT 60`,
+      );
+      requests.dataRequests = rows.map((r) => ({
+        id: int(r.id),
+        requestType: String(r.request_type ?? ""),
+        status: String(r.status ?? ""),
+        createdAt: r.created_at ? new Date(String(r.created_at)).toISOString() : "",
+        completedAt: r.completed_at ? new Date(String(r.completed_at)).toISOString() : null,
+      }));
+    } catch {
+      /* ignora: painel continua funcionando */
+    }
+  }
+
   return {
     ok: !problems.length,
     problems,
@@ -579,6 +673,7 @@ export async function buildReport(days: number): Promise<Report> {
     visits: hasViews ? visitsReport : null,
     subscribers,
     contact,
+    requests,
   };
 }
 

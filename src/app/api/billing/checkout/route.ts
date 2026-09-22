@@ -18,7 +18,7 @@ export async function POST(req: Request) {
     if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
 
     const body = await req.json().catch(() => ({}));
-    // Aceita qualquer cycle enviado; sempre resolve para o plano único vitalício.
+    // Aceita qualquer cycle enviado; sempre resolve para o plano único (pagamento único).
     const plan = resolvePlan(typeof body.cycle === "string" ? body.cycle : DEFAULT_PLAN.id);
 
     if (!isMercadoPagoConfigured() && !billingDemoEnabled) {
@@ -37,6 +37,8 @@ export async function POST(req: Request) {
     });
 
     if (result.mode === "demo") {
+      // Modo demonstração (só em desenvolvimento): registra a "compra" com os
+      // mesmos campos do fluxo real, para testar recibo e reembolso.
       await db
         .update(users)
         .set({
@@ -44,6 +46,12 @@ export async function POST(req: Request) {
           planStatus: "active",
           planCycle: plan.id,
           currentPeriodEnd: new Date(Date.now() + plan.days * 86400000),
+          paymentId: result.subscriptionId,
+          paymentProvider: "demo",
+          paidAt: new Date(),
+          paymentAmount: plan.price,
+          paymentStatus: "approved",
+          refundStatus: "none",
         })
         .where(eq(users.id, user.id));
       return NextResponse.json({ ok: true, demo: true });

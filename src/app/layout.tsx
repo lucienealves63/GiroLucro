@@ -7,6 +7,8 @@ import { ServiceWorkerRegister } from "@/components/sw-register";
 import { NotificationPrompt } from "@/components/notification-prompt";
 import { ThemeProvider } from "@/components/theme-provider";
 import { VisitTracker } from "@/components/visit-tracker";
+import { CookieConsent } from "@/components/cookie-consent";
+import { MotionProvider } from "@/components/motion-provider";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -81,14 +83,25 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body className="font-sans text-zinc-100 antialiased">
         <ThemeProvider>
-          <div className="app-shell relative mx-auto flex min-h-dvh w-full max-w-[460px] flex-col">
+          <MotionProvider>
+            <div className="app-shell relative mx-auto flex min-h-dvh w-full max-w-[460px] flex-col">
+            <a
+              href="#conteudo"
+              className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-[90] focus:rounded-xl focus:bg-volt-400 focus:px-4 focus:py-2.5 focus:text-[13px] focus:font-bold focus:text-ink-950"
+            >
+              Pular para o conteúdo
+            </a>
             <div className="texture-road pointer-events-none absolute inset-x-0 top-0 h-[420px]" />
-            <main className="relative z-10 flex-1 pb-28">{children}</main>
+            <main id="conteudo" className="relative z-10 flex-1 pb-28">
+              {children}
+            </main>
             <BottomNav />
             <ServiceWorkerRegister />
-            <NotificationPrompt />
             <VisitTracker />
-          </div>
+            <CookieConsent />
+            <NotificationPrompt />
+            </div>
+          </MotionProvider>
         </ThemeProvider>
       </body>
     </html>

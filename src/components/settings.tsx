@@ -35,6 +35,13 @@ import {
 } from "@/lib/platforms";
 import { Field, SectionTitle, Toast, useToast } from "@/components/ui";
 import { useTheme, type Theme } from "@/components/theme-provider";
+import { PRIVACY_DOC, TERMS_DOC } from "@/lib/legal";
+
+const TERMS_VERSION_LABEL = TERMS_DOC.versionLabel;
+const PRIVACY_VERSION_LABEL = PRIVACY_DOC.versionLabel;
+import { PrivacyDataSection, type AcceptanceInfo } from "@/components/privacy-data";
+import { MyPurchaseSection, type PurchaseInfo } from "@/components/my-purchase";
+import { NotificationSettingsSection } from "@/components/notification-settings";
 
 export interface SettingsForm {
   vehicleType: string;
@@ -57,6 +64,10 @@ export function SettingsClient({
   dailyFixed,
   hasData,
   platforms: initialPlatforms,
+  acceptance,
+  purchase,
+  pushDevices,
+  pushConfigured,
 }: {
   account: { name: string; email: string; planLabel: string; isPro: boolean };
   settings: SettingsForm;
@@ -65,6 +76,10 @@ export function SettingsClient({
   dailyFixed: number;
   hasData: boolean;
   platforms: PlatformMeta[];
+  acceptance: AcceptanceInfo;
+  purchase: PurchaseInfo;
+  pushDevices: number;
+  pushConfigured: boolean;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -629,6 +644,15 @@ export function SettingsClient({
           Salvar configurações
         </button>
 
+        {/* minha compra — pagamento único, arrependimento e reembolso */}
+        <MyPurchaseSection purchase={purchase} />
+
+        {/* notificações: ativar/desativar com controle do usuário */}
+        <NotificationSettingsSection devices={pushDevices} configured={pushConfigured} />
+
+        {/* direitos do titular: exportar, corrigir, cookies, excluir conta */}
+        <PrivacyDataSection acceptance={acceptance} />
+
         {/* dados */}
         <div>
           <SectionTitle>Dados do app</SectionTitle>
@@ -670,9 +694,35 @@ export function SettingsClient({
           </div>
         </div>
 
-        <p className="pb-2 pt-2 text-center text-[10.5px] font-medium tracking-wide text-zinc-600">
-          GiroLucro · feito para quem vive na correria do asfalto
-        </p>
+        {/* Rodapé jurídico do app: documentos sempre a um toque de distância */}
+        <footer className="pb-2 pt-2">
+          <nav
+            aria-label="Documentos e ajuda"
+            className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2"
+          >
+            <Link href="/termos" className="text-[11px] font-semibold text-zinc-400 underline underline-offset-4">
+              Termos de Uso
+            </Link>
+            <Link href="/privacidade" className="text-[11px] font-semibold text-zinc-400 underline underline-offset-4">
+              Política de Privacidade
+            </Link>
+            <Link href="/cookies" className="text-[11px] font-semibold text-zinc-400 underline underline-offset-4">
+              Política de Cookies
+            </Link>
+            <Link
+              href="/ajuda/compra-e-reembolso"
+              className="text-[11px] font-semibold text-zinc-400 underline underline-offset-4"
+            >
+              Compra e reembolso
+            </Link>
+          </nav>
+          <p className="mt-3 text-center text-[10.5px] leading-relaxed text-zinc-500">
+            {TERMS_VERSION_LABEL} · {PRIVACY_VERSION_LABEL}
+          </p>
+          <p className="mt-1 text-center text-[10.5px] font-medium tracking-wide text-zinc-500">
+            © 2026 GiroLucro · feito para quem vive na correria do asfalto
+          </p>
+        </footer>
       </div>
 
       <AnimatePresence>

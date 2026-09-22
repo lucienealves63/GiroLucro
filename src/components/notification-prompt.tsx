@@ -3,80 +3,107 @@
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { Bell, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { enablePush, pushPermission, pushSupported } from "@/lib/push-client";
 
-function urlBase64ToUint8Array(value: string): Uint8Array<ArrayBuffer> {
-  const padding = "=".repeat((4 - (value.length % 4)) % 4);
-  const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
-  const raw = window.atob(base64);
-  const output = new Uint8Array(new ArrayBuffer(raw.length));
-  for (let i = 0; i < raw.length; i++) output[i] = raw.charCodeAt(i);
-  return output;
+/**
+ * Convite para ativar notificações.
+ *
+ * Regras aplicadas (privacidade + boas práticas dos navegadores):
+ *  - só aparece para usuário **logado** e depois que a página carregou —
+ *    nada de pedir permissão ao abrir o app pela primeira vez;
+ *  - a permissão do navegador é pedida apenas no clique em "Ativar";
+ *  - quem já decidiu (permitiu ou bloqueou) não vê o convite de novo;
+ *  - "Agora não" fica registrado neste aparelho por 30 dias.
+ */
+
+const DISMISS_KEY = "gl_push_prompt_dismissed_at";
+const DISMISS_DAYS = 30;
+
+function dismissedRecently(): boolean {
+  try {
+    const raw = localStorage.getItem(DISMISS_KEY);
+    if (!raw) return false;
+    const when = Number(raw);
+    if (!Number.isFinite(when)) return false;
+    return Date.now() - when < DISMISS_DAYS * 86_400_000;
+  } catch {
+    return false;
+  }
 }
 
 export function NotificationPrompt() {
   const [show, setShow] = useState(false);
   const [pending, start] = useTransition();
-  const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
-  const registerPushSubscription = useCallback(async () => {
-    if (!vapidPublicKey) return false;
-    try {
-      const registration = await navigator.serviceWorker.ready;
-      let subscription = await registration.pushManager.getSubscription();
-
-      if (!subscription) {
-        subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-        });
-      }
-
-      const response = await fetch("/api/notifications/subscribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          subscription: subscription.toJSON(),
-          userAgent: navigator.userAgent,
-        }),
-      });
-      return response.ok;
-    } catch (error) {
-      console.error("Push subscription error:", error);
-      return false;
-    }
-  }, [vapidPublicKey]);
+  const register = useCallback(async () => {
+    const result = await enablePush();
+    return result.ok;
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
-    if (!vapidPublicKey) return;
+    if (!pushSupported()) return;
+    if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) return;
+    if (pushPermission() !== "default") return;
+    if (dismissedRecently()) return;
 
-    // Nunca abre a permissão automaticamente: navegadores exigem gesto do usuário.
-    if (Notification.permission === "granted") {
-      void registerPushSubscription();
-    } else if (Notification.permission === "default") {
-      setShow(true);
-    }
-  }, [registerPushSubscription, vapidPublicKey]);
+    let cancelled = false;
+    const check = async () => {
+      try {
+        const res = await fetch("/api/notifications/status", { cache: "no-store" });
+        const data = (await res.json().catch(() => ({}))) as {
+          authenticated?: boolean;
+          configured?: boolean;
+        };
+        // Visitante (landing/cadastro) nunca recebe convite de notificação.
+        if (!cancelled && data.authenticated && data.configured) setShow(true);
+      } catch {
+        /* sem servidor: simplesmente não mostra */
+      }
+    };
+    // pequena espera para não competir com o primeiro carregamento
+    const timer = setTimeout(check, 2500);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, []);
 
   const handleEnable = () => {
     start(async () => {
-      const permission = await Notification.requestPermission();
-      if (permission === "granted") await registerPushSubscription();
+      const ok = await register();
+      if (!ok) {
+        try {
+          localStorage.setItem(DISMISS_KEY, String(Date.now()));
+        } catch {
+          /* sem storage */
+        }
+      }
       setShow(false);
     });
+  };
+
+  const handleDismiss = () => {
+    try {
+      localStorage.setItem(DISMISS_KEY, String(Date.now()));
+    } catch {
+      /* sem storage */
+    }
+    setShow(false);
   };
 
   return (
     <AnimatePresence>
       {show && (
         <motion.div
+          role="dialog"
+          aria-label="Ativar notificações"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 20 }}
           className="fixed bottom-20 left-0 right-0 z-40 mx-4 flex items-center gap-3 rounded-2xl border border-volt-400/30 bg-[#0a0d10] px-4 py-3.5 shadow-lg"
         >
-          <Bell className="h-5 w-5 shrink-0 text-volt-400" />
+          <Bell className="h-5 w-5 shrink-0 text-volt-400" aria-hidden="true" />
           <div className="min-w-0 flex-1">
             <p className="text-[12.5px] font-semibold text-zinc-200">
               Receba lembretes de manutenção e metas
@@ -94,11 +121,11 @@ export function NotificationPrompt() {
               {pending ? "..." : "Ativar"}
             </button>
             <button
-              onClick={() => setShow(false)}
+              onClick={handleDismiss}
               aria-label="Agora não"
               className="pressable rounded-full p-1.5 text-zinc-500 hover:text-zinc-300"
             >
-              <X className="h-4 w-4" />
+              <X className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
         </motion.div>

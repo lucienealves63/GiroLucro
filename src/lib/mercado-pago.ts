@@ -1,5 +1,6 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { getAppUrl } from "@/lib/password-reset";
+import { PRO_PRODUCT_DESCRIPTION, PRO_PRODUCT_NAME } from "@/lib/billing";
 
 const API_BASE = "https://api.mercadopago.com";
 const accessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
@@ -124,7 +125,7 @@ async function mpFetch<T>(
 }
 
 /**
- * Cria cobrança única (preferência Checkout Pro) — R$ 19,90 vitalício.
+ * Cria cobrança única (preferência Checkout Pro) — R$ 19,90, pagamento único.
  * Mantém o nome createSubscription por compatibilidade com as rotas existentes.
  */
 export async function createSubscription(options: {
@@ -156,8 +157,10 @@ export async function createSubscription(options: {
         items: [
           {
             id: "girolucro-pro-lifetime",
-            title: "GiroLucro Pro — Acesso vitalício",
-            description: "Pagamento único · sem mensalidade",
+            // Mesmo texto da landing page, do checkout e dos Termos de Uso:
+            // sem promessa de "vitalício" desconectada do contrato.
+            title: PRO_PRODUCT_NAME,
+            description: PRO_PRODUCT_DESCRIPTION,
             quantity: 1,
             currency_id: "BRL",
             unit_price: amount,
@@ -207,7 +210,7 @@ export function getPixPayment(id: string): Promise<MercadoPagoPixPayment> {
   return mpFetch(`/v1/payments/${encodeURIComponent(id)}`);
 }
 
-/** Gera um Pix à vista (pagamento único vitalício) e retorna o QR Code. */
+/** Gera um Pix à vista (pagamento único) e retorna o QR Code. */
 export async function createPixCharge({
   userId,
   userEmail,
@@ -233,7 +236,7 @@ export async function createPixCharge({
     body: {
       transaction_amount: priceInCents / 100,
       payment_method_id: "pix",
-      description: "GiroLucro Pro — Acesso vitalício (pagamento único)",
+      description: PRO_PRODUCT_NAME,
       payer: { email: userEmail },
       external_reference: `girolucro:${userId}:${normalizedCycle}`,
       notification_url: `${appUrl}/api/billing/webhook`,
@@ -258,6 +261,35 @@ export async function createPixCharge({
     ticketUrl,
     expiresAt,
   };
+}
+
+export interface MercadoPagoRefund {
+  id?: number | string;
+  payment_id?: number | string;
+  amount?: number;
+  status?: string;
+  date_created?: string;
+}
+
+/**
+ * Estorna um pagamento (direito de arrependimento — CDC art. 49).
+ *
+ * Usa o endpoint oficial `POST /v1/payments/{id}/refunds`. A chave de
+ * idempotência é derivada do próprio pagamento, então duas tentativas
+ * simultâneas não geram dois estornos.
+ */
+export async function refundPayment(paymentId: string): Promise<MercadoPagoRefund> {
+  if (!accessToken) {
+    if (billingDemoEnabled) return { status: "approved", payment_id: paymentId };
+    throw new Error("billing_not_configured");
+  }
+  return mpFetch<MercadoPagoRefund>(
+    `/v1/payments/${encodeURIComponent(paymentId)}/refunds`,
+    {
+      method: "POST",
+      headers: { "X-Idempotency-Key": `refund-${paymentId}` },
+    },
+  );
 }
 
 export async function cancelSubscription(subscriptionId: string) {

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { contactMessages } from "@/db/schema";
+import { contactMessages, users } from "@/db/schema";
 import {
   ADMIN_COOKIE,
   adminToken,
@@ -17,10 +17,13 @@ import {
   viewContact,
   viewDiagnostics,
   viewPerformance,
+  viewRequests,
   viewSubscribers,
   viewVisits,
 } from "@/lib/admin-views";
 import { resolveRangeDays } from "@/lib/analytics";
+import { logDataSubjectRequest } from "@/lib/account";
+import { refundOutcomeEmail, sendTransactionalEmail } from "@/lib/email";
 import { getAppUrl, getAppUrlSource } from "@/lib/password-reset";
 
 export const dynamic = "force-dynamic";
@@ -41,6 +44,7 @@ const TABS = [
   { id: "visitas", label: "Acessos" },
   { id: "desempenho", label: "Desempenho das visitas" },
   { id: "assinantes", label: "Assinantes" },
+  { id: "pedidos", label: "Pedidos" },
   { id: "contato", label: "Contato" },
   { id: "diagnostico", label: "Diagnóstico" },
 ] as const;
@@ -51,6 +55,7 @@ const TITLE: Record<TabId, string> = {
   visitas: "Acessos e visitantes",
   desempenho: "Desempenho das visitas",
   assinantes: "Assinantes e conversão",
+  pedidos: "Reembolsos e solicitações de titular",
   contato: "Mensagens de contato",
   diagnostico: "Diagnóstico do painel",
 };
@@ -167,7 +172,15 @@ export async function GET(req: Request) {
                 ? "Mensagem arquivada."
                 : flash === "deleted"
                   ? "Mensagem excluída."
-                  : "Feito.",
+                  : flash === "refunded"
+                    ? "Reembolso registrado: acesso encerrado e e-mail de confirmação enviado."
+                    : flash === "refunded_noemail"
+                      ? "Reembolso registrado e acesso encerrado. E-mail não enviado (Resend não configurado)."
+                      : flash === "denied"
+                        ? "Pedido recusado: a pessoa foi avisada por e-mail e o acesso continua ativo."
+                        : flash === "denied_noemail"
+                          ? "Pedido recusado. E-mail não enviado (Resend não configurado) — avise a pessoa manualmente."
+                          : "Feito.",
         )
       : "") +
     (report.problems.length && tab !== "diagnostico" && !tabRendersSetupCallout(tab)
@@ -179,9 +192,11 @@ export async function GET(req: Request) {
         ? viewPerformance(report, tokenQs)
         : tab === "assinantes"
           ? viewSubscribers(report, tokenQs)
-          : tab === "contato"
-            ? viewContact(report, access.csrf, tokenRaw ?? "")
-            : viewDiagnostics(envStatus(report, req), report, tokenQs));
+          : tab === "pedidos"
+            ? viewRequests(report, access.csrf, tokenRaw ?? "")
+            : tab === "contato"
+              ? viewContact(report, access.csrf, tokenRaw ?? "")
+              : viewDiagnostics(envStatus(report, req), report, tokenQs));
 
   return html(
     layout({
@@ -189,7 +204,13 @@ export async function GET(req: Request) {
       active: tab,
       tabs: TABS.map((t) => ({
         id: t.id,
-        label: t.label + (t.id === "contato" && report.contact.unread ? ` (${report.contact.unread})` : ""),
+        label:
+          t.label +
+          (t.id === "contato" && report.contact.unread
+            ? ` (${report.contact.unread})`
+            : t.id === "pedidos" && report.requests.refundsPending
+              ? ` (${report.requests.refundsPending})`
+              : ""),
         href: `/admin?aba=${t.id}&dias=${days}${suffix}`,
       })),
       ranges: [7, 30, 90].map((d) => ({
@@ -275,6 +296,46 @@ export async function POST(req: Request) {
       case "delete":
         await db.delete(contactMessages).where(eq(contactMessages.id, id));
         return back("deleted");
+      case "refund_settle": {
+        // Fila manual de reembolso: o dinheiro é devolvido no painel do provedor
+        // e aqui a gente fecha o caso no app (acesso + registro + e-mail).
+        const result = String(form.get("result") ?? "");
+        if (result !== "refunded" && result !== "denied") return back("erro");
+        const approved = result === "refunded";
+        const [target] = await db.select().from(users).where(eq(users.id, id)).limit(1);
+        if (!target) return back("erro");
+        await db
+          .update(users)
+          .set(
+            approved
+              ? {
+                  refundStatus: "refunded",
+                  refundedAt: new Date(),
+                  paymentStatus: "refunded",
+                  planStatus: "canceled",
+                  planCycle: null,
+                  currentPeriodEnd: null,
+                }
+              : { refundStatus: "denied" },
+          )
+          .where(eq(users.id, id));
+        await logDataSubjectRequest({
+          userId: id,
+          requestType: "refund",
+          status: approved ? "done" : "denied",
+          note: approved ? "reembolso concluído pela equipe no painel" : "pedido recusado pela equipe",
+        });
+        const mail = refundOutcomeEmail({
+          firstName: target.name.split(" ")[0] || "tudo bem",
+          amount: target.paymentAmount ?? null,
+          approved,
+        });
+        const sent = await sendTransactionalEmail({ to: target.email, ...mail });
+        console.log(
+          `[admin] reembolso ${approved ? "concluído" : "recusado"} para a conta #${id} (e-mail: ${sent.sent ? "enviado" : sent.error})`,
+        );
+        return back(approved ? (sent.sent ? "refunded" : "refunded_noemail") : sent.sent ? "denied" : "denied_noemail");
+      }
       default:
         return back("erro");
     }

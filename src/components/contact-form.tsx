@@ -18,6 +18,7 @@ import {
 import clsx from "clsx";
 import { Logo } from "@/components/brand";
 import { CONTACT_TOPICS } from "@/lib/contact-topics";
+import { hasAnalyticsConsent } from "@/lib/cookie-consent";
 
 /**
  * Página de contato pública. Grava no banco (aparece em /admin?aba=contato)
@@ -28,8 +29,14 @@ import { CONTACT_TOPICS } from "@/lib/contact-topics";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const MIN_LEN = 12;
 
+/**
+ * Só envia o identificador de visitas quando o visitante autorizou analytics.
+ * Sem consentimento, a mensagem continua sendo registrada normalmente — o que
+ * não acontece é o vínculo com dados de navegação.
+ */
 function readVisitorId(): string | null {
   if (typeof document === "undefined") return null;
+  if (!hasAnalyticsConsent()) return null;
   const m = /(?:^|;\s*)gl_vid=([^;]*)/.exec(document.cookie);
   const value = m?.[1] ? decodeURIComponent(m[1]) : "";
   return /^[A-Za-z0-9_-]{8,64}$/.test(value) ? value : null;
@@ -184,7 +191,8 @@ export function ContactForm({
 
             <div className="mt-5 flex flex-col gap-3">
               <label className={boxClass}>
-                <User className="h-[18px] w-[18px] shrink-0 text-zinc-500" />
+                <User className="h-[18px] w-[18px] shrink-0 text-zinc-500" aria-hidden="true" />
+                <span className="sr-only">Seu nome</span>
                 <input
                   type="text"
                   value={name}
@@ -196,7 +204,8 @@ export function ContactForm({
                 />
               </label>
               <label className={boxClass}>
-                <Mail className="h-[18px] w-[18px] shrink-0 text-zinc-500" />
+                <Mail className="h-[18px] w-[18px] shrink-0 text-zinc-500" aria-hidden="true" />
+                <span className="sr-only">Seu e-mail</span>
                 <input
                   type="email"
                   value={email}
@@ -207,7 +216,8 @@ export function ContactForm({
                 />
               </label>
               <label className={boxClass}>
-                <Phone className="h-[18px] w-[18px] shrink-0 text-zinc-500" />
+                <Phone className="h-[18px] w-[18px] shrink-0 text-zinc-500" aria-hidden="true" />
+                <span className="sr-only">Celular ou WhatsApp (opcional)</span>
                 <input
                   type="tel"
                   value={phone}
@@ -221,7 +231,7 @@ export function ContactForm({
 
               <div className="rounded-2xl border border-white/[0.09] bg-white/[0.03] px-4 py-3.5 focus-within:border-volt-400/40">
                 <div className="flex items-center gap-2">
-                  <MessageSquareText className="h-[18px] w-[18px] shrink-0 text-zinc-500" />
+                  <MessageSquareText className="h-[18px] w-[18px] shrink-0 text-zinc-500" aria-hidden="true" />
                   <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-zinc-500">
                     Mensagem
                   </span>
@@ -231,7 +241,8 @@ export function ContactForm({
                       body.length > 3800 ? "text-rose-450" : "text-zinc-600",
                     )}
                   >
-                    {body.length}/4000
+                    <span aria-hidden="true">{body.length}/4000</span>
+                    <span className="sr-only">{body.length} de 4000 caracteres</span>
                   </span>
                 </div>
                 <textarea
@@ -287,6 +298,18 @@ export function ContactForm({
                   </motion.p>
                 )}
               </AnimatePresence>
+
+              <p className="text-[11.5px] leading-relaxed text-zinc-400">
+                Ao enviar esta mensagem, seus dados serão usados para responder ao seu contato
+                conforme nossa{" "}
+                <Link
+                  href="/privacidade"
+                  className="font-semibold text-volt-300 underline underline-offset-4"
+                >
+                  Política de Privacidade
+                </Link>
+                .
+              </p>
 
               <button
                 type="submit"

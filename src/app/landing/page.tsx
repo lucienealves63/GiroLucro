@@ -7,11 +7,11 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "GiroLucro — Descubra onde você realmente ganha mais | Batalha dos Apps",
   description:
-    "Faturamento bruto não é lucro. GiroLucro calcula seu lucro líquido por hora e por km, descontando combustível, manutenção, custos fixos e tempo de espera. Compare Uber × 99 × iFood × Rappi na Batalha dos Apps. 7 dias grátis, R$19,90 vitalício.",
+    "Faturamento bruto não é lucro. GiroLucro calcula seu lucro líquido por hora e por km, descontando combustível, manutenção, custos fixos e tempo de espera. Compare Uber × 99 × iFood × Rappi na Batalha dos Apps. 7 dias grátis, R$ 19,90 em pagamento único, sem mensalidade e sem renovação automática.",
   openGraph: {
     title: "GiroLucro — Seu lucro real na pista",
     description:
-      "Pare de trabalhar no escuro. Veja R$/hora líquido por app na Batalha dos Apps. Uber, 99, iFood, Rappi lado a lado. 7 dias grátis, R$19,90 vitalício sem mensalidade.",
+      "Pare de trabalhar no escuro. Veja R$/hora líquido por app na Batalha dos Apps. Uber, 99, iFood, Rappi lado a lado. 7 dias grátis, R$ 19,90 em pagamento único, sem mensalidade.",
     type: "website",
     locale: "pt_BR",
   },
