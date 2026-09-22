@@ -34,24 +34,27 @@ const HIDDEN_PREFIXES = [
 
 export function BottomNav() {
   const pathname = usePathname();
-  const [isPublicRoot, setIsPublicRoot] = useState(false);
+  const [landingDetected, setLandingDetected] = useState(false);
 
-  // Se estiver em "/" mas a landing pública estiver renderizada (visitante não logado), esconde o nav
+  // Se estiver em "/" mas a landing pública estiver renderizada (visitante não
+  // logado), esconde o nav. A checagem roda em callback (rAF/observador), nunca
+  // de forma síncrona dentro do efeito.
   useEffect(() => {
-    if (pathname !== "/") {
-      setIsPublicRoot(false);
-      return;
-    }
+    if (pathname !== "/") return;
     const check = () => {
-      const hasLanding = !!document.querySelector("[data-landing-root]");
-      setIsPublicRoot(hasLanding);
+      setLandingDetected(!!document.querySelector("[data-landing-root]"));
     };
-    check();
+    const raf = requestAnimationFrame(check);
     // observa mudanças (a landing pode montar depois)
     const obs = new MutationObserver(check);
     obs.observe(document.body, { childList: true, subtree: true });
-    return () => obs.disconnect();
+    return () => {
+      cancelAnimationFrame(raf);
+      obs.disconnect();
+    };
   }, [pathname]);
+
+  const isPublicRoot = pathname === "/" && landingDetected;
 
   if (HIDDEN_PREFIXES.some((p) => pathname.startsWith(p))) return null;
   if (isPublicRoot) return null;

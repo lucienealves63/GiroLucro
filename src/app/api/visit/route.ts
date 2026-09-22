@@ -14,6 +14,7 @@ import {
 } from "@/lib/analytics";
 import { checkRate, clientIp } from "@/lib/rate-limit";
 import { SESSION_COOKIE } from "@/lib/auth";
+import { CONSENT_COOKIE } from "@/lib/cookie-consent";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,12 @@ export const dynamic = "force-dynamic";
  *   POST /api/visit   { path, referrer, sessionId, visitorId?, viewId?, dwellMs? }
  *   GET  /api/visit?path=/landing&vid=...   (fallback sem JavaScript / img beacon)
  *
+ * Consentimento (LGPD): o identificador de visitante é uma tecnologia de
+ * analytics e SÓ é criado/gravado quando o visitante escolheu "Aceitar
+ * analytics" (cookie de primeiro domínio `gl_consent`). Enquanto a pessoa não
+ * decidiu — ou escolheu "Somente necessários" — o endpoint responde 204 e não
+ * grava nada, nem emite `gl_vid`.
+ *
  * O identificador do visitante é um UUID de **primeiro domínio** (cookie
  * `gl_vid`) — sem IP guardado e sem tracker de terceiros. Quando o visitante
  * tem sessão, salvamos também o `user_id`: é assim que o painel sabe quantas
@@ -31,6 +38,23 @@ export const dynamic = "force-dynamic";
 
 const VALID_ID = /^[A-Za-z0-9_-]{8,64}$/;
 const NO_CONTENT = new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
+
+/**
+ * Consentimento de analytics registrado no próprio navegador (cookie
+ * `gl_consent`). Sem ele, nenhuma medição acontece.
+ */
+async function analyticsConsentGiven(req: Request): Promise<boolean> {
+  let raw: string | null = null;
+  try {
+    raw = (await cookies()).get(CONSENT_COOKIE)?.value ?? null;
+  } catch {
+    raw = null;
+  }
+  if (!raw) {
+    raw = req.headers.get("cookie")?.match(new RegExp(`(?:^|;\\s*)${CONSENT_COOKIE}=([^;]+)`))?.[1] ?? null;
+  }
+  return raw === "analytics";
+}
 
 function normalizeId(raw: unknown): string {
   const value = typeof raw === "string" ? raw.trim() : "";
@@ -123,6 +147,7 @@ async function recordView(
     httpOnly: false, // lido pelo próprio beacon do app
     sameSite: "lax",
     path: "/",
+    secure: process.env.NODE_ENV === "production",
     maxAge: 365 * 86400,
   });
   return res;
@@ -130,6 +155,9 @@ async function recordView(
 
 export async function POST(req: Request) {
   try {
+    // Sem consentimento explícito de analytics: nada é gravado.
+    if (!(await analyticsConsentGiven(req))) return NO_CONTENT as NextResponse;
+
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
 
     // beacon de saída: atualiza o tempo na página da visita já registrada
@@ -165,6 +193,8 @@ export async function POST(req: Request) {
 /** Fallback sem JavaScript: <img src="/api/visit?path=/landing&vid=..."> */
 export async function GET(req: Request) {
   try {
+    if (!(await analyticsConsentGiven(req))) return NO_CONTENT as NextResponse;
+
     const url = new URL(req.url);
     const path = sanitizePath(url.searchParams.get("path"));
     if (!path || !shouldTrackPath(path)) return NO_CONTENT as NextResponse;

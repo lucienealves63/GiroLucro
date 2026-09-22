@@ -8,7 +8,7 @@ ficam no seu banco (Neon/Vercel Postgres) e a leitura é no navegador, pelo link
 
 | Endereço | O que é |
 | --- | --- |
-| `/admin` | Painel com 5 abas: **Acessos**, **Desempenho das visitas**, **Assinantes**, **Contato**, **Diagnóstico** |
+| `/admin` | Painel com 6 abas: **Acessos**, **Desempenho das visitas**, **Pagantes**, **Pedidos**, **Contato**, **Diagnóstico** |
 | `/contato` | Página pública de contato (suporte, bug, pagamento, ideia) |
 | `/api/visit` | Coleta de visitas (chamada pelo próprio app) |
 | `/api/contact` | Recebe o formulário de contato |
@@ -53,10 +53,21 @@ contra os 7 anteriores, tempo médio na página, taxa de salto, mapa de horário
 página × desempenho (participação, pessoas, tempo médio) e por onde as pessoas
 começam e abandonam.
 
-**Assinantes** — contas criadas, em teste, pagantes, recebido, funil
-*visita → conta → teste → pago*, situação das assinaturas, cadastros por dia,
-qual canal/página traz assinante e a lista dos últimos cadastros com a origem
-de cada um.
+**Pagantes** — contas criadas, em teste, pagantes, recebido, funil
+*visita → conta → teste → pago*, situação do acesso (ativo, encerrado, aguardando
+pagamento), cadastros por dia, qual canal/página traz pagante e a lista dos últimos
+cadastros com a origem de cada um.
+
+**Pedidos** — a fila de **reembolsos** e as **solicitações de titular (LGPD)**.
+Quando o reembolso não pôde ser automático (pedido fora do prazo de 7 dias,
+pagamento não-Mercado Pago ou provedor sem credencial), ele cai aqui: a aba
+mostra pessoa, valor, data da compra e o **identificador da transação** para
+buscar no Mercado Pago, com os botões *reembolso feito* / *recusar*. Fazer o
+estorno no provedor e clicar em **reembolso feito** encerra o acesso Pro, grava a
+data e envia o e-mail de confirmação — *recusar* também avisa por e-mail e
+mantém o acesso. O mesmo lugar lista exportações e exclusões de conta registradas
+com data e situação. Os *lembretes de prazo de reembolso* (e-mails de pós-venda)
+podem ser conferidos e disparados na aba **Diagnóstico**.
 
 **Contato** — a caixa de entrada do `/contato`: expandir, marcar respondida,
 arquivar, excluir e responder pelo seu e-mail. As mensagens ficam **sempre** no
@@ -70,6 +81,9 @@ com os links de correção.
 
 - Um componente no layout (`src/components/visit-tracker.tsx`) avisa o app a cada
   troca de página (`POST /api/visit`) e, ao sair da aba, envia o tempo gasto.
+- **Só com consentimento**: sem “Aceitar analytics” no banner de cookies, o app
+  não cria `gl_vid`/`gl_sid` e `POST /api/visit` responde `204` sem gravar nada
+  (LGPD + Política de Cookies). Veja `PRIVACIDADE_LGPD.md`.
 - `gl_vid` é um **UUID de primeiro domínio**: serve para contar “pessoas únicas”
   sem IP e sem tracker externo. `gl_sid` (sessionStorage) agrupa a mesma visita.
 - Robôs (Semrush, bots de link do WhatsApp, Lighthouse…) entram marcados como

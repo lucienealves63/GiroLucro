@@ -19,7 +19,8 @@
   fundo de dias fracos e provisão de férias
 - **Calculadora "vale a pena?"** — julga uma corrida/entrega pela sua média real
 - **SaaS completo** — cadastro/login (scrypt + sessões), trial de 7 dias, paywall e
-  assinaturas mensal/anual (ponto de integração Mercado Pago/Stripe documentado)
+  compra em **pagamento único** (Pix/Checkout Mercado Pago), sem mensalidade e sem
+  renovação automática
 - **Painel do dono** (`/admin`) — acessos, desempenho das visitas, assinantes/conversão
   e a caixa de entrada do `/contato`. Medição própria, sem Google Analytics, sem
   cookie de terceiros → [PAINEL_ACESSOS.md](./PAINEL_ACESSOS.md)
@@ -37,9 +38,9 @@ git clone https://github.com/SEU_USUARIO/girolucro.git
 cd girolucro
 npm install
 
-# 2. configure o banco (copie e edite)
+# 2. configure o banco e os segredos (copie e edite)
 cp .env.example .env
-# DATABASE_URL="postgresql://postgres:postgres@localhost:5432/girolucro"
+# DATABASE_URL, ADMIN_SETUP_TOKEN, APP_URL… (todas as variáveis estão no arquivo)
 
 # 3. crie as tabelas
 npx drizzle-kit push
@@ -64,10 +65,17 @@ Com terminal:
    (ou, se preferir terminal: `DATABASE_URL="<url>" npx drizzle-kit push`)
 4. Pronto — HTTPS, domínio `.vercel.app` e deploy automático a cada push
 
-## Painel de acessos, assinantes e contato
+> Opcional: agende uma vez por dia
+> `https://SEU-APP.vercel.app/api/cron/retention?token=SEU_CRON_SECRET` (limpeza por
+> tempo de retenção) e `.../api/cron/reminders?token=SEU_CRON_SECRET` (lembretes de
+> pós-venda). O agendador interno do app já roda as duas rotinas quando está em
+> produção; veja `PRIVACIDADE_LGPD.md`.
 
-- `/admin` → abas **Acessos**, **Desempenho das visitas**, **Assinantes**, **Contato**,
-  **Diagnóstico** (protegido pelo mesmo `ADMIN_SETUP_TOKEN` do setup)
+## Painel de acessos, pagantes e contato
+
+- `/admin` → abas **Acessos**, **Desempenho das visitas**, **Pagantes**, **Pedidos**
+  (fila de reembolso + solicitações de titular), **Contato**, **Diagnóstico**
+  (protegido pelo mesmo `ADMIN_SETUP_TOKEN` do setup)
 - `/contato` → formulário público; a mensagem é salva no banco e, se houver
   `RESEND_API_KEY`, vira cópia por e-mail
 - depois de publicar este código, abra **uma vez** `/api/admin/setup?token=SEU_TOKEN`
@@ -76,8 +84,30 @@ Com terminal:
 
 ## Pagamentos
 
-A integração recorrente do Mercado Pago está em `src/app/api/billing/`: checkout,
-webhook de confirmação e cancelamento. Consulte `MERCADO_PAGO_SETUP.md`.
+O GiroLucro Pro é vendido em **pagamento único** (R$ 19,90), sem recorrência.
+`src/app/api/billing/` tem: checkout (Checkout Pro), Pix, webhook de confirmação e
+reembolso (`POST /api/billing/refund`, direito de arrependimento do art. 49 do CDC).
+A rota antiga `/api/billing/cancel` continua existindo apenas para cancelar assinaturas
+recorrentes legadas — para compras novas ela responde que não existe assinatura.
+Consulte `MERCADO_PAGO_SETUP.md`.
+
+## Privacidade, cookies e LGPD
+
+- Páginas públicas: `/privacidade`, `/termos`, `/cookies` e
+  `/ajuda/compra-e-reembolso`, com versão e data de vigência (`src/lib/legal.ts`).
+- Banner de cookies com “Aceitar analytics” / “Somente necessários”; sem consentimento
+  o medidor de visitas não cria identificador e `/api/visit` responde `204`.
+- **Configurações → Privacidade e meus dados**: baixar os dados (JSON), corrigir,
+  gerenciar cookies e excluir a conta (com confirmação digitada).
+- **Configurações → Minha compra**: recibo, identificador da transação e pedido de
+  reembolso (automático quando o Mercado Pago está configurado; caso contrário entra
+  numa fila de análise manual).
+- Limpeza automática por prazo de retenção em `/api/cron/retention?token=...`
+  (ver `PRIVACIDADE_LGPD.md`).
+- **Pós-venda por e-mail** (Resend opcional): recibo com o identificador da
+  transação e o prazo de arrependimento quando a compra é confirmada, e um
+  lembrete 2–3 dias antes do fim do prazo em `/api/cron/reminders?token=...`
+  (use `&dry=1` para conferir a lista sem enviar).
 
 ## Recuperação de senha
 

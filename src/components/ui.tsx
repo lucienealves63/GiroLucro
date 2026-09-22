@@ -57,7 +57,6 @@ export function AnimatedNumber({
   const spring = useSpring(0, { stiffness: 80, damping: 20 });
   const display = useTransform(spring, (v) => format(v));
   const [text, setText] = useState(format(0));
-  const first = useRef(true);
 
   useEffect(() => {
     spring.set(value);
@@ -65,11 +64,12 @@ export function AnimatedNumber({
 
   useEffect(() => {
     const unsub = display.on("change", (v) => setText(v));
-    if (first.current) {
-      first.current = false;
-      setText(display.get());
-    }
-    return unsub;
+    // lê o valor atual no primeiro quadro (sem setState síncrono no efeito)
+    const raf = requestAnimationFrame(() => setText(display.get()));
+    return () => {
+      cancelAnimationFrame(raf);
+      unsub();
+    };
   }, [display]);
 
   return <span className={clsx("tabular", className)}>{text}</span>;

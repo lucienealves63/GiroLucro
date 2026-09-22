@@ -20,12 +20,31 @@ export const users = pgTable(
     name: text("name").notNull(),
     email: text("email").notNull(),
     passwordHash: text("password_hash").notNull(),
-    // assinatura: trialing | active | canceled
+    // assinatura: trialing | active | canceled | pending_payment | deleted
     planStatus: text("plan_status").notNull().default("trialing"),
     planCycle: text("plan_cycle"), // lifetime | monthly | yearly (legado)
     trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
     currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
     billingCustomerId: text("billing_customer_id"), // id no gateway (Stripe/Mercado Pago)
+    /* -------- aceite dos documentos jurídicos (LGPD art. 8º / CDC) -------- */
+    termsAcceptedAt: timestamp("terms_accepted_at", { withTimezone: true }),
+    termsVersion: text("terms_version"),
+    privacyAcceptedAt: timestamp("privacy_accepted_at", { withTimezone: true }),
+    privacyVersion: text("privacy_version"),
+    /* ---------------- pagamento único (Mercado Pago) --------------------- */
+    paymentId: text("payment_id"), // id da transação no provedor
+    paymentProvider: text("payment_provider"), // mercado_pago | pix | demo
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    paymentAmount: numeric("payment_amount", { precision: 10, scale: 2, mode: "number" }),
+    // approved | pending | rejected | refunded | charged_back
+    paymentStatus: text("payment_status"),
+    /* ------------- arrependimento / reembolso (CDC art. 49) ------------- */
+    refundRequestedAt: timestamp("refund_requested_at", { withTimezone: true }),
+    refundedAt: timestamp("refunded_at", { withTimezone: true }),
+    // none | requested | processing | refunded | denied | manual
+    refundStatus: text("refund_status").default("none"),
+    /* --------- exclusão de conta (anonimização p/ guarda fiscal) --------- */
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [uniqueIndex("users_email_idx").on(t.email)],
@@ -317,3 +336,56 @@ export const contactMessages = pgTable(
 );
 
 export type ContactMessage = typeof contactMessages.$inferSelect;
+
+/**
+ * Histórico de aceite dos documentos jurídicos (Termos de Uso / Política de
+ * Privacidade). Guardamos apenas documento + versão + data/hora + origem —
+ * nunca o texto inteiro do documento.
+ *
+ * As colunas equivalentes em `users` guardam o aceite vigente (último), para
+ * consulta rápida; esta tabela é o histórico auditável.
+ */
+export const legalAcceptances = pgTable(
+  "legal_acceptances",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").notNull(),
+    documentType: text("document_type").notNull(), // terms | privacy
+    documentVersion: text("document_version").notNull(), // "1.0"
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }).defaultNow().notNull(),
+    source: text("source").notNull().default("signup"), // signup | settings | checkout
+  },
+  (t) => [
+    index("legal_acceptances_user_idx").on(t.userId),
+    index("legal_acceptances_doc_idx").on(t.documentType, t.documentVersion),
+  ],
+);
+
+export type LegalAcceptance = typeof legalAcceptances.$inferSelect;
+
+/**
+ * Registro interno de solicitações de titular de dados (LGPD art. 18):
+ * exportação, correção, exclusão, reembolso/arrependimento.
+ *
+ * Guardamos o mínimo para auditoria: tipo, status, datas e uma observação
+ * curta. Nada de nome, e-mail, telefone ou conteúdo de mensagem.
+ */
+export const dataSubjectRequests = pgTable(
+  "data_subject_requests",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id"), // pode ficar órfão após exclusão da conta
+    requestType: text("request_type").notNull(), // export | deletion | refund | correction | consent
+    status: text("status").notNull().default("received"), // received | processing | done | denied
+    channel: text("channel").notNull().default("app"), // app | email | admin
+    note: text("note"), // observação técnica, sem dado pessoal
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("data_subject_requests_user_idx").on(t.userId),
+    index("data_subject_requests_type_idx").on(t.requestType, t.createdAt),
+  ],
+);
+
+export type DataSubjectRequest = typeof dataSubjectRequests.$inferSelect;

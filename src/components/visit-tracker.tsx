@@ -1,13 +1,31 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
+import { CONSENT_EVENT, analyticsAllowed, readConsent } from "@/lib/cookie-consent";
+
+/**
+ * O consentimento vive no cookie (`document.cookie`), ou seja, fora do React.
+ * `useSyncExternalStore` é a forma correta de ler essa fonte externa: nada de
+ * setState dentro de efeito e o valor se mantém atualizado quando o visitante
+ * muda de ideia em qualquer tela do app.
+ */
+function subscribeConsent(onChange: () => void) {
+  window.addEventListener(CONSENT_EVENT, onChange);
+  return () => window.removeEventListener(CONSENT_EVENT, onChange);
+}
 
 /**
  * Medidor de visitas do próprio GiroLucro (primeiro domínio, sem cookie
  * de terceiro). Monta no layout raiz, então conta tanto a landing pública
  * quanto as páginas do app.
  *
+ * ⚠️ Consentimento primeiro (LGPD): o medidor NÃO cria nenhum identificador
+ * antes de o visitante escolher "Aceitar analytics" no banner de cookies.
+ * Se a pessoa escolher "Somente necessários" — ou ainda não tiver escolhido —
+ * nada é gerado e nada é enviado ao servidor.
+ *
+ * Quando o consentimento é dado:
  * - `gl_vid`  → visitante único (persiste 1 ano, para "pessoas únicas")
  * - `gl_sid`  → visita/aba (para páginas por visita e bounce)
  * - ao sair da página envia o tempo gasto (sendBeacon) → "tempo médio"
@@ -60,25 +78,18 @@ function sessionId(): string {
   }
 }
 
-function disabled(): boolean {
-  if (typeof window === "undefined") return true;
-  // opt-out explícito (para você não se contar no gráfico enquanto testa)
-  if (process.env.NEXT_PUBLIC_ANALYTICS === "off") return true;
-  try {
-    return localStorage.getItem("gl_analytics_off") === "1";
-  } catch {
-    return false;
-  }
-}
-
 export function VisitTracker() {
   const pathname = usePathname();
   const lastPath = useRef<string | null>(null);
   const viewId = useRef<number>(0);
   const enteredAt = useRef<number>(0); // preenchido no efeito (evita impureza no render)
+  const consent = useSyncExternalStore(subscribeConsent, readConsent, () => null);
 
   useEffect(() => {
-    if (disabled()) return;
+    // Nada é medido sem "Aceitar analytics" — a checagem lê o cookie direto,
+    // então nem um primeiro render atrasado cria identificador à toa.
+    if (!analyticsAllowed()) return;
+
     const path = pathname || "/";
     if (lastPath.current === path) return; // StrictMode/dev double-invoke
     lastPath.current = path;
@@ -144,7 +155,7 @@ export function VisitTracker() {
       window.removeEventListener("pagehide", sendDwell);
       document.removeEventListener("visibilitychange", onHide);
     };
-  }, [pathname]);
+  }, [pathname, consent]);
 
   return null;
 }

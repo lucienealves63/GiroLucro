@@ -22,6 +22,7 @@ import {
 import clsx from "clsx";
 import Link from "next/link";
 import { rideVerdict } from "@/lib/calculations";
+import { DECISION_DISCLAIMER } from "@/lib/business-info";
 import { brl, brlSign, parseBR } from "@/lib/format";
 import type { PlatformMeta } from "@/lib/platforms";
 import { resolvePlatformMeta } from "@/lib/platforms";
@@ -831,7 +832,7 @@ export function RegisterClient({
                       )}
                     >
                       {verdict.verdict === "boa"
-                        ? "Boa — aceita e roda!"
+                        ? "Acima da sua média — segue o cálculo."
                         : verdict.verdict === "mediana"
                           ? "Na média — você decide."
                           : "Abaixo da sua média."}
@@ -857,6 +858,11 @@ export function RegisterClient({
               ou entrega comparando com o seu histórico.
             </p>
           )}
+          {/* Aviso de estimativa: o resultado é matemática sobre os dados informados */}
+          <p className="mt-3 rounded-2xl border border-white/[0.07] bg-white/[0.02] px-3.5 py-2.5 text-[11.5px] leading-relaxed text-zinc-400">
+            <strong className="font-bold text-zinc-200">Estimativa.</strong>{" "}
+            {DECISION_DISCLAIMER}
+          </p>
         </div>
       </div>
 

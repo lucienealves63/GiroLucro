@@ -23,6 +23,8 @@ import {
   Check,
 } from "lucide-react";
 import { Logo } from "@/components/brand";
+import { SiteFooter } from "@/components/site-footer";
+import { SIMULATION_NOTICE, socialProofLabel } from "@/lib/business-info";
 
 type LandingProps = {
   isLogged: boolean;
@@ -191,8 +193,8 @@ export function LandingClient({ isLogged }: LandingProps) {
               <p className="flex items-center gap-2 text-[12px] text-zinc-500">
                 <ShieldCheck className="h-4 w-4 text-volt-400" />
                 <span>
-                  <span className="font-semibold text-zinc-300">R$19,90 pagamento único</span> · vitalício · sem
-                  mensalidade · cancela quando quiser
+                  <span className="font-semibold text-zinc-300">R$ 19,90 em pagamento único</span> · sem
+                  mensalidade · sem renovação automática
                 </span>
               </p>
             </motion.div>
@@ -209,7 +211,7 @@ export function LandingClient({ isLogged }: LandingProps) {
                   <div className="h-6 w-6 rounded-full border-2 border-[#08090c] bg-zinc-400" />
                   <div className="h-6 w-6 rounded-full border-2 border-[#08090c] bg-zinc-500" />
                 </div>
-                <span className="text-[11px] font-semibold text-zinc-400">+500 motoboys e motoristas</span>
+                <span className="text-[11px] font-semibold text-zinc-400">{socialProofLabel()}</span>
               </div>
               <span className="flex items-center gap-1.5 text-[11px] font-medium text-zinc-500">
                 <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" /> PWA instalável · funciona offline
@@ -233,11 +235,13 @@ export function LandingClient({ isLogged }: LandingProps) {
                   </div>
                   <div>
                     <p className="font-display text-[15px] font-bold leading-none text-zinc-50">Batalha dos apps</p>
-                    <p className="mt-1 text-[11px] text-zinc-500">Últimos 7 dias · lucro líquido/hora</p>
+                    <p className="mt-1 text-[11px] text-zinc-400">
+                      Simulação de 7 dias · lucro líquido/hora
+                    </p>
                   </div>
                 </div>
                 <span className="rounded-full bg-volt-400/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-volt-300">
-                  AO VIVO
+                  EXEMPLO
                 </span>
               </div>
 
@@ -294,8 +298,8 @@ export function LandingClient({ isLogged }: LandingProps) {
                 <p className="flex items-start gap-2 text-[11.5px] leading-snug text-volt-200">
                   <Flame className="mt-0.5 h-3.5 w-3.5 shrink-0 text-volt-400" />
                   <span>
-                    <span className="font-bold">99 está pagando 20% a mais</span> que iFood nessa semana. Vale a pena
-                    focar lá entre 18h-22h.
+                    Neste exemplo, o <span className="font-bold">99 aparece 20% acima</span> do iFood. Com os seus
+                    números, a conclusão pode ser outra.
                   </span>
                 </p>
               </div>
@@ -312,7 +316,9 @@ export function LandingClient({ isLogged }: LandingProps) {
                 <TrendingUp className="h-4 w-4 text-emerald-400" />
               </div>
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Lucro líquido hoje</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                  Lucro líquido (exemplo)
+                </p>
                 <p className="tabular font-display text-[14px] font-bold text-zinc-50">R$ 127,40</p>
               </div>
             </motion.div>
@@ -432,7 +438,9 @@ export function LandingClient({ isLogged }: LandingProps) {
           <div className="relative">
             <div className="overflow-hidden rounded-[24px] border border-white/[0.07] bg-[#08090c]">
               <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-4">
-                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-zinc-500">Exemplo real · 7 dias</p>
+                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-zinc-400">
+                  Exemplo ilustrativo · simulação de 7 dias
+                </p>
                 <div className="flex gap-1.5">
                   <span className="h-2 w-2 rounded-full bg-white/20" />
                   <span className="h-2 w-2 rounded-full bg-white/20" />
@@ -471,13 +479,18 @@ export function LandingClient({ isLogged }: LandingProps) {
                   </div>
                 </div>
 
-                <div className="mt-6 rounded-2xl border border-amber-400/20 bg-amber-400/[0.06] p-3.5">
+                <p className="mt-5 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-3.5 text-[11.5px] leading-relaxed text-zinc-300">
+                  <strong className="font-bold text-zinc-100">Exemplo ilustrativo.</strong>{" "}
+                  {SIMULATION_NOTICE}
+                </p>
+
+                <div className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-400/[0.06] p-3.5">
                   <p className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-amber-300">
-                    <Timer className="h-3.5 w-3.5" /> Raio-X estratégico
+                    <Timer className="h-3.5 w-3.5" aria-hidden="true" /> Raio-X estratégico (exemplo)
                   </p>
                   <p className="mt-2 text-[12.5px] leading-relaxed text-zinc-300">
-                    Você perdeu <span className="font-bold text-amber-300">3h12min</span> esperando em restaurante essa
-                    semana. Sem essa espera, seu R$/hora iria de{" "}
+                    No exemplo, foram <span className="font-bold text-amber-300">3h12min</span> esperando em
+                    restaurante na semana. Sem essa espera, o R$/hora iria de{" "}
                     <span className="font-semibold">R$ 19,80</span> para{" "}
                     <span className="font-bold text-volt-300">R$ 23,40</span>.
                   </p>
@@ -536,11 +549,12 @@ export function LandingClient({ isLogged }: LandingProps) {
                 <h3 className="mt-4 font-display text-[28px] font-bold leading-tight text-zinc-50 md:text-[34px]">
                   R$ 19,90 uma vez.
                   <br />
-                  <span className="text-volt-400">Vitalício.</span>
+                  <span className="text-volt-400">Sem mensalidade.</span>
                 </h3>
                 <p className="mt-3 text-[14px] leading-relaxed text-zinc-400">
-                  Sem mensalidade. Sem renovação automática. Pague uma vez e use para sempre. Menos que 1 litro de
-                  gasolina pra saber quanto você realmente lucra todo mês.
+                  Pagamento único, sem renovação automática e sem cobrança recorrente. Você paga uma
+                  vez e continua com acesso aos recursos Pro por tempo indeterminado, enquanto o
+                  serviço existir.
                 </p>
 
                 <div className="mt-6 flex flex-col gap-2.5">
@@ -550,7 +564,7 @@ export function LandingClient({ isLogged }: LandingProps) {
                     "Lucro real automático e calculadora 'vale a pena?'",
                     "Oficina, metas, repasses e reserva",
                     "PWA instalável, funciona offline",
-                    "Suporte direto no WhatsApp",
+                    "Suporte por e-mail e pelo formulário de contato",
                   ].map((f) => (
                     <div key={f} className="flex items-center gap-2.5 text-[13px] text-zinc-300">
                       <span className="flex h-5 w-5 items-center justify-center rounded-full bg-volt-400 text-ink-950">
@@ -569,7 +583,9 @@ export function LandingClient({ isLogged }: LandingProps) {
                     <span className="font-display text-[42px] font-bold leading-none text-zinc-50">R$ 19,90</span>
                     <span className="text-[13px] font-semibold text-zinc-500">uma vez</span>
                   </div>
-                  <p className="mt-2 text-[12px] font-medium text-volt-300">Pagamento único · acesso total sem mensalidade</p>
+                  <p className="mt-2 text-[12px] font-medium text-volt-300">
+                    Pagamento único · sem mensalidade · sem renovação automática
+                  </p>
 
                   <div className="mt-5 rounded-xl bg-white/[0.04] px-3 py-2.5">
                     <p className="flex items-center gap-2 text-[11px] font-semibold text-zinc-400">
@@ -592,16 +608,33 @@ export function LandingClient({ isLogged }: LandingProps) {
                     {isLogged ? "Voltar ao app" : "Já tenho conta · Entrar"}
                   </Link>
 
-                  <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-[10.5px] leading-relaxed text-zinc-600">
-                    <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+                  <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-[10.5px] leading-relaxed text-zinc-400">
+                    <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     Pagamento seguro via Mercado Pago · Pix e cartão
+                  </p>
+
+                  <p className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center text-[10.5px] font-semibold text-zinc-500">
+                    <Link href="/termos" className="underline underline-offset-4 hover:text-zinc-300">
+                      Termos de Uso
+                    </Link>
+                    <Link href="/privacidade" className="underline underline-offset-4 hover:text-zinc-300">
+                      Política de Privacidade
+                    </Link>
+                    <Link
+                      href="/ajuda/compra-e-reembolso"
+                      className="underline underline-offset-4 hover:text-zinc-300"
+                    >
+                      Política de reembolso
+                    </Link>
                   </p>
                 </div>
 
                 <div className="mt-4 rounded-2xl border border-amber-400/15 bg-amber-400/[0.06] p-3.5">
                   <p className="text-[12px] font-semibold leading-snug text-amber-200">
-                    💡 Cálculo rápido: se a Batalha te mostra que 99 paga R$ 3/h a mais e você roda 6h/dia, são{" "}
-                    <span className="font-bold text-amber-100">R$ 360/mês a mais</span> só de escolher o app certo.
+                    💡 Conta de padaria (exemplo): se a sua Batalha mostrar R$ 3/h de diferença e você
+                    rodar 6h/dia, a projeção é de{" "}
+                    <span className="font-bold text-amber-100">R$ 360/mês</span> — mas o número que vale
+                    é o dos seus registros.
                   </p>
                 </div>
               </div>
@@ -689,37 +722,23 @@ export function LandingClient({ isLogged }: LandingProps) {
       </section>
 
       {/* ---------- FOOTER ---------- */}
-      <footer className="border-t border-white/[0.06] bg-[#08090c] py-10">
-        <div className="mx-auto max-w-[1080px] px-5 md:px-8">
-          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+      <div className="w-full bg-[#08090c]">
+        <div className="mx-auto max-w-[1080px] px-5 pt-10 md:px-8">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-3">
               <Logo />
               <span className="h-4 w-px bg-white/10" />
-              <span className="text-[11px] font-medium text-zinc-500">
-                Feito para quem vive na pista. Uber, 99, iFood, Rappi.
+              <span className="text-[11px] font-medium text-zinc-400">
+                Feito para quem vive na pista.
               </span>
             </div>
-            <div className="flex items-center gap-4 text-[11px] font-semibold text-zinc-500">
-              <Link href="/entrar" className="hover:text-zinc-300">
-                Entrar
-              </Link>
-              <Link href="/criar-conta" className="hover:text-zinc-300">
-                Criar conta
-              </Link>
-              <Link href="/contato" className="hover:text-zinc-300">
-                Contato
-              </Link>
-              <span className="flex items-center gap-1.5">
-                <BadgeCheck className="h-3.5 w-3.5 text-volt-400" /> R$19,90 vitalício
-              </span>
-            </div>
+            <p className="text-[11px] font-semibold text-zinc-400">
+              R$ 19,90 em pagamento único · sem mensalidade
+            </p>
           </div>
-          <p className="mt-6 text-[10.5px] leading-relaxed text-zinc-600">
-            GiroLucro não tem vínculo com Uber, 99, iFood ou Rappi. É uma ferramenta independente para motoristas e
-            motoboys calcularem lucro real. Valores da Batalha são baseados nos seus registros pessoais.
-          </p>
         </div>
-      </footer>
+        <SiteFooter />
+      </div>
     </div>
   );
 }

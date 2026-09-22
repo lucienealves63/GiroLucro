@@ -9,6 +9,8 @@ import {
   createSession,
   hashPassword,
 } from "@/lib/auth";
+import { PRIVACY_VERSION, TERMS_VERSION } from "@/lib/legal";
+import { recordLegalAcceptance } from "@/lib/legal-acceptance";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +22,19 @@ export async function POST(req: Request) {
     const name = String(body.name ?? "").trim();
     const email = String(body.email ?? "").trim().toLowerCase();
     const password = String(body.password ?? "");
+
+    // Aceite obrigatório dos documentos jurídicos (LGPD art. 8º / CDC art. 30).
+    // Sem o aceite explícito, a conta não é criada de forma alguma.
+    const accepted = body.acceptedTermsAndPrivacy === true;
+    if (!accepted) {
+      return NextResponse.json(
+        {
+          error:
+            "Para criar a conta é preciso aceitar os Termos de Uso e a Política de Privacidade.",
+        },
+        { status: 400 },
+      );
+    }
 
     if (name.length < 2 || name.length > 60) {
       return NextResponse.json({ error: "Informe seu nome" }, { status: 400 });
@@ -42,6 +57,7 @@ export async function POST(req: Request) {
       );
     }
 
+    const acceptedAt = new Date();
     const [user] = await db
       .insert(users)
       .values({
@@ -50,8 +66,19 @@ export async function POST(req: Request) {
         passwordHash: await hashPassword(password),
         planStatus: "trialing",
         trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 86400000),
+        // guardamos versão + data/hora do aceite (não o texto dos documentos)
+        termsAcceptedAt: acceptedAt,
+        termsVersion: TERMS_VERSION,
+        privacyAcceptedAt: acceptedAt,
+        privacyVersion: PRIVACY_VERSION,
       })
       .returning();
+
+    // histórico auditável do aceite (documento, versão, data e origem)
+    await recordLegalAcceptance(user.id, "signup", acceptedAt).catch((e) => {
+      // nunca impede o cadastro: o aceite já ficou gravado na linha do usuário
+      console.error("[legal] falha ao registrar histórico de aceite:", e);
+    });
 
     const { token, expiresAt } = await createSession(user.id);
 
@@ -60,6 +87,7 @@ export async function POST(req: Request) {
       httpOnly: true,
       sameSite: "lax",
       path: "/",
+      secure: process.env.NODE_ENV === "production",
       maxAge: SESSION_DAYS * 86400,
       expires: expiresAt,
     });

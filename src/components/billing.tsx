@@ -20,6 +20,8 @@ import { DEFAULT_PLAN } from "@/lib/billing";
 import { brl } from "@/lib/format";
 import { Logo } from "@/components/brand";
 import { Toast, useToast } from "@/components/ui";
+import { BUSINESS_INFO, VENDOR_PENDING_NOTICE, vendorAddressLine, vendorIdentifierLine } from "@/lib/business-info";
+import { PRO_PAYMENT_LINES } from "@/lib/billing";
 
 type PixResponse = {
   ok?: boolean;
@@ -243,7 +245,8 @@ export function BillingClient({
               </span>
             </h1>
             <p className="mt-2 text-[13.5px] leading-relaxed text-zinc-400">
-              Pague uma vez e libere o Pro para sempre — sem mensalidade e sem renovação.
+              Pague uma vez e libere o Pro: pagamento único, sem mensalidade e sem renovação
+              automática.
             </p>
           </>
         ) : status === "pending" ? (
@@ -293,6 +296,14 @@ export function BillingClient({
         <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-zinc-500">
           GiroLucro Pro
         </p>
+        <ul className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[11.5px] font-semibold text-zinc-300">
+          {PRO_PAYMENT_LINES.map((line) => (
+            <li key={line} className="flex items-center gap-1.5">
+              <Check className="h-3.5 w-3.5 text-volt-400" strokeWidth={3} aria-hidden="true" />
+              {line}
+            </li>
+          ))}
+        </ul>
         <p className="mt-1.5 flex items-baseline gap-1.5">
           <span className="tabular font-display text-[36px] font-bold leading-none text-zinc-50">
             {brl(plan.price)}
@@ -334,11 +345,7 @@ export function BillingClient({
             {pending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Crown className="h-5 w-5" strokeWidth={2.4} />}
             {pending
               ? "Abrindo checkout..."
-              : status === "pending"
-                ? "Continuar pagamento"
-                : status === "canceled"
-                  ? `Reativar Pro · ${brl(plan.price)}`
-                  : `Liberar Pro · ${brl(plan.price)}`}
+              : `Pagar ${brl(plan.price)} · liberar o Pro`}
           </button>
 
           {!pix && (
@@ -348,7 +355,7 @@ export function BillingClient({
               className="pressable mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-volt-400/35 bg-volt-400/[0.07] py-4 font-display text-[15.5px] font-bold text-volt-300 disabled:opacity-50"
             >
               {pixPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <QrCode className="h-5 w-5" strokeWidth={2.4} />}
-              {pixPending ? "Gerando Pix..." : `Pagar com Pix · ${brl(plan.price)}`}
+              {pixPending ? "Gerando Pix..." : `Pagar ${brl(plan.price)} com Pix`}
             </button>
           )}
         </>
@@ -433,10 +440,50 @@ export function BillingClient({
         </div>
       )}
 
-      <p className="mt-4 flex items-start justify-center gap-1.5 text-center text-[10.5px] leading-relaxed text-zinc-600">
-        <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+      <div className="mt-5 rounded-3xl border border-white/[0.07] bg-white/[0.02] p-5">
+        <h2 className="text-[11px] font-bold uppercase tracking-[0.16em] text-zinc-500">
+          Quem está vendendo
+        </h2>
+        <p className="mt-2 text-[12.5px] font-bold text-zinc-200">
+          {BUSINESS_INFO.businessName}
+          {BUSINESS_INFO.legalName ? ` — ${BUSINESS_INFO.legalName}` : ""}
+        </p>
+        {vendorIdentifierLine() && (
+          <p className="text-[11.5px] text-zinc-400">{vendorIdentifierLine()}</p>
+        )}
+        {vendorAddressLine() && (
+          <p className="text-[11.5px] text-zinc-400">Endereço comercial: {vendorAddressLine()}</p>
+        )}
+        <p className="text-[11.5px] text-zinc-400">
+          E-mail:{" "}
+          <a
+            href={`mailto:${BUSINESS_INFO.supportEmail}`}
+            className="font-semibold text-volt-300 underline underline-offset-4"
+          >
+            {BUSINESS_INFO.supportEmail}
+          </a>
+        </p>
+        {!vendorIdentifierLine() && (
+          <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">{VENDOR_PENDING_NOTICE}</p>
+        )}
+        <p className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[11.5px] font-semibold">
+          <Link href="/termos" className="text-volt-300 underline underline-offset-4">
+            Termos de Uso
+          </Link>
+          <Link href="/privacidade" className="text-volt-300 underline underline-offset-4">
+            Política de Privacidade
+          </Link>
+          <Link href="/ajuda/compra-e-reembolso" className="text-volt-300 underline underline-offset-4">
+            Política de reembolso
+          </Link>
+        </p>
+      </div>
+
+      <p className="mt-4 flex items-start justify-center gap-1.5 text-center text-[10.5px] leading-relaxed text-zinc-500">
+        <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
         Pagamento seguro via Mercado Pago. Valor único de {brl(plan.price)} — sem
-        mensalidade e sem renovação automática.
+        mensalidade e sem renovação automática. O acesso é liberado por tempo
+        indeterminado, enquanto o serviço existir.
       </p>
 
       <Toast msg={msg} />

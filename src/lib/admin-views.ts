@@ -3,7 +3,7 @@ import { barRows, card, esc, kpi, note, table, visitsChart } from "@/lib/admin-h
 import type { NamedCount, Report } from "@/lib/admin-report";
 
 /**
- * As quatro telas do painel /admin (acessos, desempenho, assinantes, contato).
+ * As telas do painel /admin (acessos, desempenho, assinantes, pedidos, contato).
  * Renderizam HTML a partir do `Report` – sem JavaScript no navegador.
  */
 
@@ -271,7 +271,7 @@ export function viewSubscribers(r: Report, tokenQs = ""): string {
         ? `<span class="down">${n(s.trialsEndingSoon)} vencem em 3 dias</span>`
         : `${n(s.trialsExpired)} já venceram`,
     )}
-    ${kpi("Pagantes", n(s.paying), `${pct(s.paidRate, 1)} das contas · vitalício`)}
+    ${kpi("Pagantes", n(s.paying), `${pct(s.paidRate, 1)} das contas · pagamento único`)}
     ${kpi("Recebido", esc(revenue), `${n(s.pendingPayment)} aguardando Pix/cartão`)}
   </div>
 
@@ -289,11 +289,11 @@ export function viewSubscribers(r: Report, tokenQs = ""): string {
           : ""),
     )}
     ${card(
-      "Situação das assinaturas",
+      "Situação do acesso",
       barRows(s.byStatus) +
-        `<p class="small" style="margin-top:10px">${n(s.canceled)} canceladas · ${n(
+        `<p class="small" style="margin-top:10px">${n(s.canceled)} acessos encerrados · ${n(
           s.activeLast7,
-        )} assinantes abriram o app nos últimos 7 dias</p>`,
+        )} pagantes abriram o app nos últimos 7 dias</p>`,
     )}
   </div>
 
@@ -306,7 +306,7 @@ export function viewSubscribers(r: Report, tokenQs = ""): string {
   )}
 
   <div class="grid g2" style="margin-top:12px">
-    ${card("Qual canal traz assinante", barRows(
+    ${card("Qual canal traz pagante", barRows(
       relabelChannels(s.attribution).map((a) => ({ ...a, hint: a.hint })),
       "Sem sessão de visita vinculada ainda.",
     ))}
@@ -466,6 +466,8 @@ export function viewDiagnostics(
         <div class="row"><span class="name">Diagnóstico de pagamento</span><span></span><a class="btn" href="/api/admin/billing-status${esc(tokenQs)}">abrir ↗</a></div>
         <div class="row"><span class="name">Diagnóstico de e-mail</span><span></span><a class="btn" href="/api/admin/email-status${esc(tokenQs)}">abrir ↗</a></div>
         <div class="row"><span class="name">Gerar visitas de demonstração</span><span></span><a class="btn" href="/api/admin/demo-visits${esc(tokenQs)}&dias=30">rodar ↗</a></div>
+        <div class="row"><span class="name">Lembretes de reembolso (conferir, sem enviar)</span><span></span><a class="btn" href="/api/cron/reminders${esc(tokenQs)}&dry=1">abrir ↗</a></div>
+        <div class="row"><span class="name">Lembretes de reembolso (enviar agora)</span><span></span><a class="btn" href="/api/cron/reminders${esc(tokenQs)}">rodar ↗</a></div>
         <div class="row"><span class="name">Exportar acessos (CSV)</span><span></span><a class="btn" href="/api/admin/export?table=visits${esc(amp(tokenQs))}">baixar ↗</a></div>
         <div class="row"><span class="name">Ver como JSON (integrações)</span><span></span><a class="btn" href="/admin?format=json">abrir ↗</a></div>
       </div>`,
@@ -478,5 +480,137 @@ export function viewDiagnostics(
        <p class="small" style="margin-top:8px">Troque o intervalo nos chips acima (7 / 30 / 90 dias) ou na URL: <code>?dias=90</code>.</p>`,
     )}
   </div>
+  `;
+}
+
+/* ---------------------- pedidos de reembolso / LGPD ----------------------- */
+
+const REFUND_STATUS_LABELS: Record<string, string> = {
+  requested: "pedido aberto",
+  processing: "processando",
+  manual: "análise manual",
+  refunded: "reembolsado",
+  denied: "não aprovado",
+  none: "sem pedido",
+};
+
+const REQUEST_TYPE_LABELS: Record<string, string> = {
+  export: "Exportação de dados",
+  deletion: "Exclusão de conta",
+  refund: "Reembolso",
+  correction: "Correção",
+  consent: "Consentimento",
+};
+
+function money(v: number | null): string {
+  if (v === null) return "—";
+  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function isPending(status: string | null): boolean {
+  return status === "manual" || status === "requested" || status === "processing";
+}
+
+/**
+ * Fila de reembolso (quando o Mercado Pago não pôde ser chamado direto ou o
+ * pedido chegou fora do prazo) + histórico de solicitações de titular (LGPD).
+ */
+export function viewRequests(r: Report, csrf: string, tokenParam: string): string {
+  const qs = tokenParam ? `&token=${encodeURIComponent(tokenParam)}` : "";
+  const all = r.requests.refunds;
+  const pending = all.filter((x) => isPending(x.refundStatus));
+  const history = all.filter((x) => !isPending(x.refundStatus));
+
+  const pendingCards = pending.length
+    ? pending
+        .map(
+          (x) => `<details class="msg" open>
+            <summary>
+              <span class="tag ${esc(x.refundStatus ?? "")}">${esc(REFUND_STATUS_LABELS[x.refundStatus ?? ""] ?? x.refundStatus ?? "")}</span>
+              <span class="who">${esc(x.name)}</span>
+              <span class="mail">${esc(x.email)}</span>
+              <span class="mail">· ${money(x.amount)} · compra em ${dateBR(x.paidAt ?? "")}${
+                x.daysSincePurchase !== null
+                  ? ` (${x.daysSincePurchase} dia${x.daysSincePurchase === 1 ? "" : "s"})`
+                  : ""
+              }</span>
+              <span class="actions">
+                <button class="btn" form="rf-ok-${x.userId}" type="submit">reembolso feito</button>
+                <button class="btn dan" form="rf-no-${x.userId}" type="submit">recusar</button>
+              </span>
+            </summary>
+            <div class="meta">
+              <span>Conta #${x.userId}</span>
+              <span>Pago por <code>${esc(x.provider ?? "—")}</code> · status ${esc(x.paymentStatus ?? "—")}</span>
+              <span>Identificador para buscar no provedor: <code>${esc(x.paymentId ?? "—")}</code></span>
+              <span>Pedido aberto em ${dateBR(x.requestedAt ?? "")}</span>
+              <span>${x.withinWindow ? "Dentro do prazo de 7 dias" : "Fora do prazo de 7 dias — análise comercial"}</span>
+            </div>
+            <form class="inline" id="rf-ok-${x.userId}" method="POST" action="/admin?aba=pedidos${qs}">
+              <input type="hidden" name="csrf" value="${esc(csrf)}" />
+              <input type="hidden" name="tab" value="pedidos" />
+              <input type="hidden" name="action" value="refund_settle" />
+              <input type="hidden" name="id" value="${x.userId}" />
+              <input type="hidden" name="result" value="refunded" />
+            </form>
+            <form class="inline" id="rf-no-${x.userId}" method="POST" action="/admin?aba=pedidos${qs}">
+              <input type="hidden" name="csrf" value="${esc(csrf)}" />
+              <input type="hidden" name="tab" value="pedidos" />
+              <input type="hidden" name="action" value="refund_settle" />
+              <input type="hidden" name="id" value="${x.userId}" />
+              <input type="hidden" name="result" value="denied" />
+            </form>
+          </details>`,
+        )
+        .join("")
+    : `<div class="empty">Nenhum pedido aguardando ação. 🎉</div>`;
+
+  return `
+  <div class="grid g4" style="margin-bottom:12px">
+    ${kpi("Aguardando ação", n(pending.length), pending.length ? "reembolso pendente" : "fila vazia")}
+    ${kpi("Reembolsos registrados", n(history.filter((x) => x.refundStatus === "refunded").length), "últimos 60 pedidos")}
+    ${kpi("Solicitações LGPD", n(r.requests.dataRequests.length), "exportação/exclusão registradas")}
+    ${kpi("Prazo de reembolso", "7 dias", "contados da confirmação do pagamento")}
+  </div>
+
+  ${note(
+    "info",
+    "Como processar um reembolso",
+    `Abra o <b>Mercado Pago → Atividade</b>, busque pelo <b>identificador da transação</b> mostrado no pedido e use a opção <b>Reembolsar</b>. Depois clique em <b>reembolso feito</b> aqui: o app encerra o acesso Pro, grava a data e envia o e-mail de confirmação. Se preferir recusar, escolha <b>recusar</b> — a pessoa recebe o aviso e o acesso continua ativo.`,
+  )}
+
+  ${card(`Fila de reembolso · ${n(pending.length)} pedido(s)`, pendingCards)}
+
+  ${card(
+    "Histórico de reembolsos",
+    history.length
+      ? table(
+          ["Pessoa", "Valor", "Compra", "Pedido", "Situação"],
+          history.map((x) => [
+            `${esc(x.name)}<div class="small">${esc(x.email)}</div>`,
+            money(x.amount),
+            dateBR(x.paidAt ?? ""),
+            dateBR(x.requestedAt ?? ""),
+            esc(REFUND_STATUS_LABELS[x.refundStatus ?? ""] ?? x.refundStatus ?? "—"),
+          ]),
+        )
+      : `<div class="empty">Nenhum reembolso concluído ou recusado ainda.</div>`,
+  )}
+
+  ${card(
+    "Solicitações de titular (LGPD)",
+    r.requests.dataRequests.length
+      ? table(
+          ["#", "Tipo", "Registrada em", "Concluída em", "Situação"],
+          r.requests.dataRequests.map((d) => [
+            String(d.id),
+            esc(REQUEST_TYPE_LABELS[d.requestType] ?? d.requestType),
+            dateBR(d.createdAt),
+            d.completedAt ? dateBR(d.completedAt) : "—",
+            esc(d.status),
+          ]),
+        )
+      : `<div class="empty">Nenhuma solicitação registrada. Exportações e exclusões aparecem aqui.</div>`,
+  )}
   `;
 }
