@@ -50,9 +50,14 @@ Pronto — código no GitHub sem nunca abrir um terminal.
 
 4. Clique **"Deploy"** → aguarde ~1 minuto → site no ar em `https://girolucro-xxxx.vercel.app`
 
-## Passo 4 — Criar as tabelas (só abrir um link!)
+## Passo 4 — Criar as tabelas (automático!)
 
-Nada de `npm`, nada de `drizzle-kit`. Apenas abra no navegador:
+Quando o código é publicado, o app **cria/atualiza as tabelas do banco
+sozinho** — no primeiro acesso depois de cada deploy, ele aplica automaticamente
+tudo o que o novo código trouxe (tabelas, colunas ou índices novos).
+Nada de `npm`, nada de `drizzle-kit`, nada de abrir link.
+
+Quer conferir, ou forçar uma reexecução? Abra no navegador:
 
 ```
 https://girolucro-xxxx.vercel.app/api/admin/setup?token=meu-sitio-123
@@ -65,8 +70,9 @@ Você verá uma tela bonita listando cada tabela criada, incluindo
 (histórico de aceite dos Termos e da Privacidade) e `data_subject_requests`
 (solicitações de titular) → clique em **"Criar minha conta de administrador"**.
 
-> ⏫ **Atualizou o código depois?** Abra este mesmo link de novo: ele cria as
-> tabelas novas sem mexer no que já existe.
+> 🔁 O link é **idempotente**: pode rodar quantas vezes quiser — ele só cria o
+> que falta e mostra o que já existe. Serve principalmente como diagnóstico
+> caso algo pareça fora do normal.
 
 ## Passo 5 — Sua conta e pronto!
 
@@ -79,6 +85,8 @@ Você verá uma tela bonita listando cada tabela criada, incluindo
 Quando quiser mudar o app:
 - Edite qualquer arquivo **direto no GitHub** (ícone de lápis em cima do arquivo) → Commit
 - A Vercel **republica automaticamente** a cada alteração
+- Se o código trouxer **tabelas/colunas novas no banco**, elas também são
+  aplicadas **automaticamente** no primeiro acesso depois do deploy
 
 ## Passo 6 — Painel de acessos e contato (opcional, 1 minuto)
 
