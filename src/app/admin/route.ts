@@ -304,6 +304,14 @@ export async function POST(req: Request) {
         const approved = result === "refunded";
         const [target] = await db.select().from(users).where(eq(users.id, id)).limit(1);
         if (!target) return back("erro");
+        // Guardas: a ação só vale para um pedido realmente em aberto e, quando o
+        // caso é "reembolso feito", para uma conta com compra registrada.
+        const inProgress =
+          target.refundStatus === "manual" ||
+          target.refundStatus === "requested" ||
+          target.refundStatus === "processing";
+        if (!inProgress) return back("erro");
+        if (approved && !target.paymentId) return back("erro");
         await db
           .update(users)
           .set(

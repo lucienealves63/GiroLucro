@@ -1,4 +1,4 @@
-import { and, eq, gte, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
+import { and, eq, gte, isNotNull, isNull, lt, notInArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { notificationLogs, users } from "@/db/schema";
 import {
@@ -130,7 +130,12 @@ export async function runRefundWindowReminders(
         isNotNull(users.paidAt),
         gte(users.paidAt, from),
         lt(users.paidAt, to),
-        or(eq(users.refundStatus, "none"), isNull(users.refundStatus)),
+        // Fora da lista: quem já está com pedido em andamento ou já foi
+        // reembolsado. "denied" volta a receber o aviso — pode pedir de novo.
+        or(
+          isNull(users.refundStatus),
+          notInArray(users.refundStatus, ["requested", "processing", "manual", "refunded"]),
+        ),
       ),
     )
     .limit(limit);

@@ -245,7 +245,8 @@ export function BillingClient({
               </span>
             </h1>
             <p className="mt-2 text-[13.5px] leading-relaxed text-zinc-400">
-              Pague uma vez e libere o Pro para sempre — sem mensalidade e sem renovação.
+              Pague uma vez e libere o Pro: pagamento único, sem mensalidade e sem renovação
+              automática.
             </p>
           </>
         ) : status === "pending" ? (
