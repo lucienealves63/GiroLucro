@@ -99,7 +99,8 @@ export function MyPurchaseSection({ purchase }: { purchase: PurchaseInfo }) {
   };
 
   return (
-    <div>
+    // `id` usado nos e-mails de pós-venda (Configurações → Minha compra).
+    <div id="minha-compra" className="scroll-mt-6">
       <SectionTitle>Minha compra</SectionTitle>
 
       {!purchase.paidAt ? (

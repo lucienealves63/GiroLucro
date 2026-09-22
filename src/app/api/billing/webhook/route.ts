@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { billingEvents, users, type User } from "@/db/schema";
 import { DEFAULT_PLAN, resolvePlan, type Plan } from "@/lib/billing";
+import { sendPurchaseReceipt } from "@/lib/purchase";
 import {
   getAuthorizedPayment,
   getPayment,
@@ -233,12 +234,29 @@ export async function POST(req: Request) {
 
         if (payApproved && validAmount && validCurrency) {
           const paidAt = payment.date_approved ?? payment.date_created;
+          const paidAtDate = paidAt ? new Date(paidAt) : new Date();
+          const isNewPurchase = referencedUser.paymentId !== String(payment.id);
           await activateLifetime(referencedUser.id, claimed.id, {
             id: payment.id,
             provider: "mercado_pago",
             amount: payAmount,
-            paidAt: paidAt ? new Date(paidAt) : new Date(),
+            paidAt: paidAtDate,
           });
+          // Recibo por e-mail (uma vez por compra): o webhook pode ser reenviado
+          // em outros eventos de atualização do mesmo pagamento.
+          if (isNewPurchase) {
+            await sendPurchaseReceipt(referencedUser, {
+              paymentId: String(payment.id),
+              provider: "mercado_pago",
+              amount: payAmount,
+              paidAt: paidAtDate,
+            }).catch((e) => {
+              console.error(
+                "[billing] falha ao enviar o recibo:",
+                e instanceof Error ? e.message : e,
+              );
+            });
+          }
           if (!referencedUser.billingCustomerId?.startsWith("pix:")) {
             await db
               .update(users)

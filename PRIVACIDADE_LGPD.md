@@ -18,6 +18,7 @@
 | Exportar / excluir dados | `src/lib/account.ts` + `src/app/api/account/*` |
 | Reembolso (art. 49 do CDC) | `src/app/api/billing/refund/route.ts` |
 | Retenção e limpeza automática | `src/lib/retention.ts` + `src/app/api/cron/retention/route.ts` |
+| E-mails de pós-venda (recibo + lembrete do prazo) | `src/lib/purchase.ts` + `src/lib/email.ts` |
 
 ## 2. Mapa de dados
 
@@ -48,6 +49,7 @@ Todos ficam em **Configurações → Privacidade e meus dados** (`src/components
 | Revogar consentimento | Painel de cookies (“Gerenciar cookies”): voltar para “Somente necessários” apaga `gl_vid`/`gl_sid` | `CookiePreferencesButton` |
 | Excluir conta | Confirmação digitando `EXCLUIR`; apaga os dados pessoais e, quando existe compra, mantém apenas o registro mínimo exigido (anonimizado) | `DELETE /api/account` |
 | Reembolso | Pedido com registro e resposta por e-mail | `POST /api/billing/refund` |
+| Ser avisado do prazo | Recibo na confirmação da compra + lembrete 2 a 3 dias antes do fim do prazo | `src/lib/purchase.ts` (`/api/cron/reminders`) |
 
 Cada solicitação atendida gera uma linha em `data_subject_requests` (`logDataSubjectRequest`),
 sem copiar os dados pessoais do pedido — serve para provar que o pedido foi atendido.
@@ -63,18 +65,25 @@ sem copiar os dados pessoais do pedido — serve para provar que o pedido foi at
   ignora requisições de bots conhecidos (`src/lib/analytics.ts`).
 - Quem já usava o app antes desta mudança mantém o opt-out antigo (`localStorage.gl_analytics_off`).
 
-## 5. Rotina de limpeza
+## 5. Rotinas automáticas
 
 ```bash
-# Executa a limpeza uma vez (o mesmo endpoint pode ser chamado por um cron)
+# Limpeza de retenção (o mesmo endpoint pode ser chamado por um cron externo)
 curl "https://SEU-APP.vercel.app/api/cron/retention?token=$CRON_SECRET"
+
+# Lembretes de pós-venda por e-mail (confira sem enviar com &dry=1)
+curl "https://SEU-APP.vercel.app/api/cron/reminders?token=$CRON_SECRET&dry=1"
+curl "https://SEU-APP.vercel.app/api/cron/reminders?token=$CRON_SECRET"
 ```
 
 - Em produção, agende 1x por dia (Vercel Cron ou cron-job.org) apontando para
   `/api/cron/retention` com o `CRON_SECRET` (ou `ADMIN_SETUP_TOKEN`).
 - A resposta é um relatório com o que foi apagado (`deleted.*`).
-- Um agendador interno (`src/lib/notification-cron.ts`) roda a limpeza às 03:00
-  (horário de Brasília) quando o processo está em produção ou com `RUN_CRON_LOCAL=true`.
+- Um agendador interno (`src/lib/notification-cron.ts`) roda a limpeza às 03:00 e os
+  e-mails de pós-venda às 08:00 (horário de Brasília) quando o processo está em
+  produção ou com `RUN_CRON_LOCAL=true`.
+- Cada pessoa recebe **um** lembrete de prazo: o envio é registrado em
+  `notification_logs` (tipo `email_lembrete_reembolso`) e é isso que impede repetição.
 
 ## 6. Terceiros usados
 
@@ -116,9 +125,11 @@ de obrigação legal e legítimo interesse — sempre com o mínimo necessário)
    (`SOCIAL_PROOF.approvedUsersCount`, hoje `null`).
 6. **Registro de acesso** — se a operação exigir, avaliar log de acesso a dados
    pessoais (hoje há log de erros do servidor apenas).
-7. **Pós-venda (roadmap, ainda não implementado)** — aviso de compra aprovada,
-   e-mail de recibo, lembrete antes do fim dos 7 dias de arrependimento, pedido de
-   avaliação e régua de reembolso automatizada por e-mail.
+7. **Testar o envio de e-mail de verdade** — com Resend configurado, faça uma
+   compra de teste e confira o recibo; depois use
+   `/api/cron/reminders?token=...&dry=1` para ver quem receberia o lembrete do prazo
+   (e, sem o `dry=1`, para enviar). Ainda pendente de roadmap: pedido de avaliação
+   depois do período de adaptação e régua de cobrança/recuperação por e-mail.
 
 > Ao alterar qualquer texto jurídico, atualize `TERMS_VERSION`/`PRIVACY_VERSION` em
 > `src/lib/legal.ts`: o app passa a registrar o novo aceite e a avisar quem aceitou

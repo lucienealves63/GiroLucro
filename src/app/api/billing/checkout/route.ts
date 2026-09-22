@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { getSessionUser, hasAccess } from "@/lib/auth";
 import { DEFAULT_PLAN, resolvePlan } from "@/lib/billing";
+import { sendPurchaseReceipt } from "@/lib/purchase";
 import {
   billingDemoEnabled,
   createSubscription,
@@ -39,6 +40,8 @@ export async function POST(req: Request) {
     if (result.mode === "demo") {
       // Modo demonstração (só em desenvolvimento): registra a "compra" com os
       // mesmos campos do fluxo real, para testar recibo e reembolso.
+      const isNewPurchase = user.paymentId !== result.subscriptionId;
+      const paidAt = new Date();
       await db
         .update(users)
         .set({
@@ -48,12 +51,25 @@ export async function POST(req: Request) {
           currentPeriodEnd: new Date(Date.now() + plan.days * 86400000),
           paymentId: result.subscriptionId,
           paymentProvider: "demo",
-          paidAt: new Date(),
+          paidAt,
           paymentAmount: plan.price,
           paymentStatus: "approved",
           refundStatus: "none",
+          refundRequestedAt: null,
+          refundedAt: null,
         })
         .where(eq(users.id, user.id));
+      if (isNewPurchase) {
+        // Mesmo caminho do webhook real: o modo demo também gera recibo.
+        await sendPurchaseReceipt(user, {
+          paymentId: result.subscriptionId,
+          provider: "demo",
+          amount: plan.price,
+          paidAt,
+        }).catch((e) => {
+          console.error("[billing] falha ao enviar o recibo:", e instanceof Error ? e.message : e);
+        });
+      }
       return NextResponse.json({ ok: true, demo: true });
     }
 

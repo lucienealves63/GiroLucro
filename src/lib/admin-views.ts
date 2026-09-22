@@ -466,6 +466,8 @@ export function viewDiagnostics(
         <div class="row"><span class="name">Diagnóstico de pagamento</span><span></span><a class="btn" href="/api/admin/billing-status${esc(tokenQs)}">abrir ↗</a></div>
         <div class="row"><span class="name">Diagnóstico de e-mail</span><span></span><a class="btn" href="/api/admin/email-status${esc(tokenQs)}">abrir ↗</a></div>
         <div class="row"><span class="name">Gerar visitas de demonstração</span><span></span><a class="btn" href="/api/admin/demo-visits${esc(tokenQs)}&dias=30">rodar ↗</a></div>
+        <div class="row"><span class="name">Lembretes de reembolso (conferir, sem enviar)</span><span></span><a class="btn" href="/api/cron/reminders${esc(tokenQs)}&dry=1">abrir ↗</a></div>
+        <div class="row"><span class="name">Lembretes de reembolso (enviar agora)</span><span></span><a class="btn" href="/api/cron/reminders${esc(tokenQs)}">rodar ↗</a></div>
         <div class="row"><span class="name">Exportar acessos (CSV)</span><span></span><a class="btn" href="/api/admin/export?table=visits${esc(amp(tokenQs))}">baixar ↗</a></div>
         <div class="row"><span class="name">Ver como JSON (integrações)</span><span></span><a class="btn" href="/admin?format=json">abrir ↗</a></div>
       </div>`,

@@ -32,6 +32,19 @@ export function startNotificationCron() {
     } catch (e) {
       console.error("Cron error:", e);
     }
+
+    // Pós-venda: lembrete do prazo de arrependimento (ver src/lib/purchase.ts).
+    try {
+      const { runRefundWindowReminders } = await import("@/lib/purchase");
+      const report = await runRefundWindowReminders();
+      console.log(
+        `✉️  Lembretes de reembolso: ${report.sent} enviado(s) de ${report.candidates} candidato(s)${
+          report.skipped ? ` — pendência: ${report.skipped}` : ""
+        }`,
+      );
+    } catch (e) {
+      console.error("Refund reminder error:", e);
+    }
   });
 
   // 03:00 UTC-3 = 06:00 UTC — limpeza de retenção de dados
@@ -46,7 +59,7 @@ export function startNotificationCron() {
     }
   });
 
-  console.log("✅ Cron de notificações + retenção inicializado");
+  console.log("✅ Cron de notificações + retenção + pós-venda inicializado");
 }
 
 /**

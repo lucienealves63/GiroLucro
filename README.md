@@ -65,8 +65,11 @@ Com terminal:
    (ou, se preferir terminal: `DATABASE_URL="<url>" npx drizzle-kit push`)
 4. Pronto — HTTPS, domínio `.vercel.app` e deploy automático a cada push
 
-> Opcional: agende `https://SEU-APP.vercel.app/api/cron/retention?token=SEU_CRON_SECRET`
-> uma vez por dia para a limpeza de dados por tempo de retenção (ver `PRIVACIDADE_LGPD.md`).
+> Opcional: agende uma vez por dia
+> `https://SEU-APP.vercel.app/api/cron/retention?token=SEU_CRON_SECRET` (limpeza por
+> tempo de retenção) e `.../api/cron/reminders?token=SEU_CRON_SECRET` (lembretes de
+> pós-venda). O agendador interno do app já roda as duas rotinas quando está em
+> produção; veja `PRIVACIDADE_LGPD.md`.
 
 ## Painel de acessos, assinantes e contato
 
@@ -101,6 +104,10 @@ Consulte `MERCADO_PAGO_SETUP.md`.
   numa fila de análise manual).
 - Limpeza automática por prazo de retenção em `/api/cron/retention?token=...`
   (ver `PRIVACIDADE_LGPD.md`).
+- **Pós-venda por e-mail** (Resend opcional): recibo com o identificador da
+  transação e o prazo de arrependimento quando a compra é confirmada, e um
+  lembrete 2–3 dias antes do fim do prazo em `/api/cron/reminders?token=...`
+  (use `&dry=1` para conferir a lista sem enviar).
 
 ## Recuperação de senha
 

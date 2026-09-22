@@ -58,6 +58,15 @@ export async function sendTransactionalEmail({
 }): Promise<MailResult> {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;
+
+  // Desenvolvimento sem chave: simula o envio para permitir testar recibo,
+  // reembolso e lembretes de ponta a ponta. Nunca vale em produção.
+  if (process.env.NODE_ENV !== "production" && process.env.EMAIL_DEV_MODE === "true") {
+    console.info(`[email][dev] SIMULADO (nada foi enviado) → ${maskEmail(to)} | ${subject}`);
+    console.info(`[email][dev] ${text.slice(0, 1400)}`);
+    return { sent: true, error: null };
+  }
+
   if (!apiKey || !from) {
     console.warn(
       "[email] RESEND_API_KEY/EMAIL_FROM ausentes — e-mail não enviado para",
@@ -181,4 +190,137 @@ export function accountDeletionEmail(params: {
     </p>`;
   const text = [title, "", detail, "", `Contato: ${BUSINESS_INFO.supportEmail}`].join("\n");
   return { subject: "Sua conta do GiroLucro foi excluída", html: layout(title, inner), text };
+}
+
+/* ----------------------------- pós-venda -------------------------------- */
+
+const money = (v: number | null, fallback = "valor pago"): string =>
+  v === null || !Number.isFinite(v)
+    ? fallback
+    : v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+const brDate = (value: Date | null): string =>
+  value && Number.isFinite(value.getTime())
+    ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "America/Sao_Paulo" }).format(value)
+    : "—";
+
+const PROVIDER_LABELS: Record<string, string> = {
+  mercado_pago: "Mercado Pago",
+  pix: "Pix (Mercado Pago)",
+  demo: "Ambiente de demonstração",
+};
+
+/**
+ * Recibo da compra do GiroLucro Pro (pagamento único), enviado quando o
+ * pagamento é confirmado. Além do recibo, informa por escrito o prazo de
+ * arrependimento — o CDC garante 7 dias e a pessoa precisa saber disso.
+ */
+export function purchaseReceiptEmail(params: {
+  firstName: string;
+  amount: number | null;
+  paidAt: Date | null;
+  paymentId: string | null;
+  provider: string | null;
+  refundDeadline: Date | null;
+  settingsUrl: string;
+}): { subject: string; html: string; text: string } {
+  const title = "Compra confirmada: bem-vindo ao GiroLucro Pro.";
+  const provider = PROVIDER_LABELS[params.provider ?? ""] ?? params.provider ?? "—";
+  const inner = `
+    <p style="margin:0 0 14px;font-size:14.5px;line-height:1.65;color:#a1a1aa">
+      Olá, ${escapeHtml(params.firstName)}. Seu pagamento foi aprovado e o acesso ao GiroLucro Pro já está liberado nesta conta.
+    </p>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="font-size:14px;margin-bottom:14px">
+      <tr><td style="padding:6px 0;color:#71717a;width:150px">Produto</td><td style="color:#f4f4f5;font-weight:700">GiroLucro Pro — pagamento único</td></tr>
+      <tr><td style="padding:6px 0;color:#71717a">Valor</td><td style="color:#f4f4f5;font-weight:700">${escapeHtml(money(params.amount))}</td></tr>
+      <tr><td style="padding:6px 0;color:#71717a">Pago em</td><td style="color:#f4f4f5">${escapeHtml(brDate(params.paidAt))}</td></tr>
+      <tr><td style="padding:6px 0;color:#71717a">Forma de pagamento</td><td style="color:#f4f4f5">${escapeHtml(provider)}</td></tr>
+      <tr><td style="padding:6px 0;color:#71717a">Identificador</td><td style="color:#f4f4f5">${escapeHtml(params.paymentId ?? "—")}</td></tr>
+      <tr><td style="padding:6px 0;color:#71717a">Como é cobrado</td><td style="color:#f4f4f5">Uma vez só — sem mensalidade e sem renovação automática</td></tr>
+    </table>
+    <p style="margin:0;font-size:14px;line-height:1.65;color:#a1a1aa">
+      <b style="color:#f4f4f5">Direito de arrependimento:</b> por lei (art. 49 do Código de Defesa do Consumidor) você pode desistir da compra em até 7 dias corridos e receber 100% do valor de volta. Nesta compra o prazo vai até <b style="color:#f4f4f5">${escapeHtml(brDate(params.refundDeadline))}</b>.
+    </p>
+    <p style="margin:16px 0 0;font-size:14px;line-height:1.65;color:#a1a1aa">
+      Para usar ou para pedir o reembolso, entre em <b style="color:#f4f4f5">Configurações → Minha compra</b>:
+      <a href="${escapeHtml(params.settingsUrl)}" style="color:#b8f53c;font-weight:700">${escapeHtml(params.settingsUrl)}</a>
+    </p>
+    <p style="margin:14px 0 0;font-size:13px;line-height:1.6;color:#71717a">
+      Também guardamos este recibo dentro do app, no mesmo lugar. Precisa de ajuda? Responda este e-mail ou escreva para ${escapeHtml(BUSINESS_INFO.supportEmail)} (${escapeHtml(BUSINESS_INFO.supportHours)}).
+    </p>`;
+  const text = [
+    title,
+    "",
+    `Produto: GiroLucro Pro — pagamento único`,
+    `Valor: ${money(params.amount)}`,
+    `Pago em: ${brDate(params.paidAt)}`,
+    `Forma de pagamento: ${provider}`,
+    `Identificador: ${params.paymentId ?? "—"}`,
+    "Como é cobrado: uma vez só — sem mensalidade e sem renovação automática",
+    "",
+    `Direito de arrependimento: você pode desistir em até 7 dias corridos e receber 100% do valor de volta. O prazo desta compra vai até ${brDate(params.refundDeadline)}.`,
+    "",
+    `Usar ou pedir reembolso: Configurações → Minha compra`,
+    params.settingsUrl,
+    "",
+    `Contato: ${BUSINESS_INFO.supportEmail}`,
+  ].join("\n");
+  return { subject: "Compra confirmada — recibo do GiroLucro Pro", html: layout(title, inner), text };
+}
+
+/**
+ * Lembrete de fim do prazo de arrependimento (enviado 2 dias antes de fechar).
+ * É um aviso de transparência, não uma oferta: nada de insistência ou desconto.
+ */
+export function refundWindowReminderEmail(params: {
+  firstName: string;
+  amount: number | null;
+  paidAt: Date | null;
+  refundDeadline: Date | null;
+  /** Quantos dias ainda faltam (1 = último dia). */
+  daysLeft: number;
+  settingsUrl: string;
+}): { subject: string; html: string; text: string } {
+  const prazo = params.daysLeft <= 1 ? "termina hoje" : `termina em ${params.daysLeft} dias`;
+  const title =
+    params.daysLeft <= 1
+      ? "Hoje é o último dia para pedir reembolso, se quiser."
+      : "O prazo para pedir reembolso está terminando.";
+  const inner = `
+    <p style="margin:0 0 14px;font-size:14.5px;line-height:1.65;color:#a1a1aa">
+      Olá, ${escapeHtml(params.firstName)}. Sua compra do GiroLucro Pro (${escapeHtml(money(params.amount))}, em ${escapeHtml(brDate(params.paidAt))}) está com o prazo de arrependimento perto do fim.
+    </p>
+    <p style="margin:0;font-size:14px;line-height:1.65;color:#a1a1aa">
+      O prazo de arrependimento ${escapeHtml(prazo)}: você pode pedir
+      <b style="color:#f4f4f5">100% do valor de volta</b> até
+      <b style="color:#f4f4f5">${escapeHtml(brDate(params.refundDeadline))}</b>, sem precisar justificar nada
+      (art. 49 do Código de Defesa do Consumidor).
+    </p>
+    <p style="margin:16px 0 0;font-size:14px;line-height:1.65;color:#a1a1aa">
+      Se quiser fazer o pedido, é em <b style="color:#f4f4f5">Configurações → Minha compra</b>:
+      <a href="${escapeHtml(params.settingsUrl)}" style="color:#b8f53c;font-weight:700">${escapeHtml(params.settingsUrl)}</a>
+    </p>
+    <p style="margin:14px 0 0;font-size:13px;line-height:1.6;color:#71717a">
+      E se estiver tudo certo com o app, ignore este e-mail: sua conta continua ativa e nada muda. Dúvidas? Escreva para ${escapeHtml(BUSINESS_INFO.supportEmail)}.
+    </p>`;
+  const text = [
+    title,
+    "",
+    `Compra: GiroLucro Pro — pagamento único, ${money(params.amount)}, em ${brDate(params.paidAt)}.`,
+    `Prazo de arrependimento (100% do valor de volta) ${prazo}, até ${brDate(params.refundDeadline)} — sem precisar justificar.`,
+    "",
+    "Pedir reembolso: Configurações → Minha compra",
+    params.settingsUrl,
+    "",
+    "Se estiver tudo certo com o app, ignore este e-mail: sua conta continua ativa e nada muda.",
+    `Contato: ${BUSINESS_INFO.supportEmail}`,
+  ].join("\n");
+  return {
+    subject:
+      params.daysLeft <= 1
+        ? "Último dia do prazo de reembolso — GiroLucro"
+        : `Reembolso: faltam ${params.daysLeft} dias — GiroLucro`,
+    html: layout(title, inner),
+    text,
+  };
 }

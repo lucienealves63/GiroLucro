@@ -66,7 +66,8 @@ buscar no Mercado Pago, com os botões *reembolso feito* / *recusar*. Fazer o
 estorno no provedor e clicar em **reembolso feito** encerra o acesso Pro, grava a
 data e envia o e-mail de confirmação — *recusar* também avisa por e-mail e
 mantém o acesso. O mesmo lugar lista exportações e exclusões de conta registradas
-com data e situação.
+com data e situação. Os *lembretes de prazo de reembolso* (e-mails de pós-venda)
+podem ser conferidos e disparados na aba **Diagnóstico**.
 
 **Contato** — a caixa de entrada do `/contato`: expandir, marcar respondida,
 arquivar, excluir e responder pelo seu e-mail. As mensagens ficam **sempre** no
