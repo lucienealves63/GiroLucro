@@ -23,6 +23,15 @@ export const users = pgTable(
     // assinatura: trialing | active | canceled | pending_payment | deleted
     planStatus: text("plan_status").notNull().default("trialing"),
     planCycle: text("plan_cycle"), // lifetime | monthly | yearly (legado)
+    /**
+     * Conta de teste (dono do app, QA, demonstração).
+     *
+     * Duas consequências, decididas no painel /admin (aba Pagantes):
+     *  1. acesso Pro sempre liberado, sem trial e sem cobrança (ver `hasAccess`);
+     *  2. a conta fica FORA das estatísticas do painel (cadastros, conversão,
+     *     pagantes, receita, funil) para não distorcer os números do negócio.
+     */
+    isTest: boolean("is_test").notNull().default(false),
     trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
     currentPeriodEnd: timestamp("current_period_end", { withTimezone: true }),
     billingCustomerId: text("billing_customer_id"), // id no gateway (Stripe/Mercado Pago)

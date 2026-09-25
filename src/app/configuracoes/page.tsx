@@ -8,6 +8,7 @@ import { costPerKm, dailyFixedShare, monthlyFixed } from "@/lib/calculations";
 import { parsePlatformsJson } from "@/lib/platforms";
 import { acceptanceSummary } from "@/lib/legal-acceptance";
 import { refundWindowFor } from "@/lib/legal";
+import { isTestAccount } from "@/lib/test-accounts";
 
 export const dynamic = "force-dynamic";
 
@@ -19,9 +20,12 @@ export default async function ConfiguracoesPage() {
   const s = data.settings;
   const platforms = parsePlatformsJson(s.platformsJson);
 
+  const testAccount = isTestAccount(user);
   const trial = trialDaysLeft(user);
   let planLabel = "Teste grátis";
-  if (user.planStatus === "active" && user.currentPeriodEnd) {
+  if (testAccount) {
+    planLabel = "Conta de teste · Pro liberado sem cobrança";
+  } else if (user.planStatus === "active" && user.currentPeriodEnd) {
     // pagamento único ou legado com período muito longo (~10+ anos)
     const isSinglePayment =
       user.planCycle === "lifetime" ||
@@ -75,9 +79,8 @@ export default async function ConfiguracoesPage() {
         name: user.name,
         email: user.email,
         planLabel,
-        isPro:
-          user.planStatus === "active" ||
-          (user.planStatus === "canceled" && hasAccess(user)),
+        isPro: testAccount || user.planStatus === "active" || (user.planStatus === "canceled" && hasAccess(user)),
+        isTest: testAccount,
       }}
       settings={{
         vehicleType: s.vehicleType,

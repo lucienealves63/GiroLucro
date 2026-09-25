@@ -25,10 +25,11 @@ export const dynamic = "force-dynamic";
 
 function tagLabel(kind: SetupKind, created: boolean): { css: string; text: string } {
   if (!created) {
-    return { css: "skip-tag", text: "JÁ EXISTIA" };
+    return { css: "skip-tag", text: kind === "data" ? "JÁ APLICADO" : "JÁ EXISTIA" };
   }
   if (kind === "column") return { css: "ok-tag", text: "COLUNA ✓" };
   if (kind === "index") return { css: "ok-tag", text: "ÍNDICE ✓" };
+  if (kind === "data") return { css: "ok-tag", text: "APLICADO ✓" };
   return { css: "ok-tag", text: "CRIADA ✓" };
 }
 
@@ -78,6 +79,8 @@ function page(title: string, rows: string, ok: boolean): string {
       variáveis de ambiente — assim ninguém mais roda este setup.
       Cada tabela/coluna já é criada com segurança: rodar duas vezes não tem problema.
       A coluna <code>settings.platforms_json</code> habilita apps personalizados.
+      A coluna <code>users.is_test</code> marca contas de teste (acesso liberado sem
+      cobrança e fora das métricas) — a conta administrativa é marcada automaticamente.
       As tabelas <code>page_views</code> e <code>contact_messages</code> ligam o painel de acessos
       (<code>/admin</code>) e o formulário de contato (<code>/contato</code>).
     </p>

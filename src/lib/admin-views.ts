@@ -258,7 +258,54 @@ export function viewPerformance(r: Report, tokenQs = "?token=SEU_TOKEN"): string
 
 /* ------------------------------ 3. assinantes ------------------------------ */
 
-export function viewSubscribers(r: Report, tokenQs = ""): string {
+/**
+ * Contas de teste (`users.is_test`): fora de todos os números acima.
+ *
+ * Ficam num card próprio porque são justamente as contas que você usa para
+ * testar o app — elas não podem contar como cliente, conversão nem receita.
+ * Marcar/desmarcar é aqui, sem deploy.
+ */
+function testAccountsCard(r: Report, csrf: string, tokenQs: string): string {
+  const s = r.subscribers;
+  const action = `/admin?aba=assinantes${amp(tokenQs)}`;
+  const hidden = (name: string, value: string): string =>
+    `<input type="hidden" name="${name}" value="${esc(value)}" />`;
+  const fields = hidden("csrf", csrf) + hidden("tab", "assinantes");
+
+  const lista = s.testAccounts.length
+    ? table(
+        ["Conta", "Criada", "Situação", ""],
+        s.testAccounts.map((a) => [
+          `<b>${esc(a.name)}</b><div class="small">${esc(a.email)}</div>`,
+          esc(a.createdDay ? `${a.createdDay.slice(8, 10)}/${a.createdDay.slice(5, 7)}` : "—"),
+          `<span class="tag teste">conta de teste</span>`,
+          `<form class="inline" method="POST" action="${esc(action)}">
+             ${fields}${hidden("action", "test_remove")}${hidden("id", String(a.id))}
+             <button class="btn dan" type="submit">remover teste</button>
+           </form>`,
+        ]),
+      )
+    : `<div class="empty"><b>Nenhuma conta de teste ainda.</b>Marque abaixo o e-mail da conta que você usa para testar (a conta administrativa entra automaticamente no deploy).</div>`;
+
+  return card(
+    `Contas de teste · ${n(s.testTotal)}`,
+    `<p class="small" style="margin-bottom:10px">
+      Conta de teste tem o <b style="color:#7dd3fc">Pro liberado sem cobrança</b> e fica
+      <b style="color:#7dd3fc">fora das estatísticas</b> desta aba (cadastros, conversão,
+      pagantes, receita e funil) — assim testar o app não mexe nos números do negócio.
+      O acesso liberado e a exclusão dos números valem para a conta inteira; as visitas
+      gravadas nas páginas continuam contando como acesso.
+    </p>
+    ${lista}
+    <form method="POST" action="${esc(action)}" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+      ${fields}${hidden("action", "test_add")}
+      <input class="inp" type="email" name="email" placeholder="e-mail da conta" autocomplete="off" required />
+      <button class="btn pri" type="submit">Marcar como conta de teste</button>
+    </form>`,
+  );
+}
+
+export function viewSubscribers(r: Report, csrf: string, tokenQs = ""): string {
   const s = r.subscribers;
   const revenue = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(s.revenue);
   return `
@@ -274,6 +321,11 @@ export function viewSubscribers(r: Report, tokenQs = ""): string {
     ${kpi("Pagantes", n(s.paying), `${pct(s.paidRate, 1)} das contas · pagamento único`)}
     ${kpi("Recebido", esc(revenue), `${n(s.pendingPayment)} aguardando Pix/cartão`)}
   </div>
+  ${s.testTotal
+    ? `<p class="small" style="margin:-4px 0 12px">Fora de todos estes números:
+        <span class="tag teste">${n(s.testTotal)} conta${s.testTotal === 1 ? "" : "s"} de teste</span>
+        — acesso liberado sem cobrança, listadas no fim desta aba.</p>`
+    : ""}
 
   <div class="grid g2" style="margin-bottom:12px">
     ${card(
@@ -320,18 +372,27 @@ export function viewSubscribers(r: Report, tokenQs = ""): string {
     "Últimos cadastros",
     s.recent.length
       ? table(
-          ["Quem", "Criada", "Situação", "Canal", "Vinda de"],
+          ["Quem", "Criada", "Situação", "Canal", "Vinda de", ""],
           s.recent.map((u) => [
             `<b>${esc(u.name)}</b><div class="small">${esc(u.email)}</div>`,
             esc(u.createdDay ? `${u.createdDay.slice(8, 10)}/${u.createdDay.slice(5, 7)}` : "—"),
             `<span class="tag ${u.statusClass}">${esc(u.statusLabel)}</span>`,
             esc(channelLabel(u.channel)),
             `<div>${esc(u.entryPath)}</div><div class="small">${esc(u.referrer)}</div>`,
+            `<form class="inline" method="POST" action="${esc(`/admin?aba=assinantes${amp(tokenQs)}`)}">
+               <input type="hidden" name="csrf" value="${esc(csrf)}" />
+               <input type="hidden" name="tab" value="assinantes" />
+               <input type="hidden" name="action" value="${u.isTest ? "test_remove" : "test_add"}" />
+               <input type="hidden" name="id" value="${u.id}" />
+               <button class="btn${u.isTest ? " dan" : ""}" type="submit">${u.isTest ? "remover teste" : "tornar teste"}</button>
+             </form>`,
           ]),
         )
       : `<div class="empty"><b>Nenhuma conta criada ainda.</b>Compartilhe sua landing e as visitas/cadastros aparecem aqui automaticamente.</div>`,
     `<a href="/api/admin/export?table=users${amp(tokenQs)}">exportar CSV</a>`,
   )}</div>
+
+  <div style="margin-top:12px">${testAccountsCard(r, csrf, tokenQs)}</div>
   `;
 }
 

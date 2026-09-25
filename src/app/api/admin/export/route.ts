@@ -42,6 +42,7 @@ const TABLES: Record<string, { sql: string; file: string }> = {
   users: {
     file: "girolucro-assinantes",
     sql: `SELECT u.id, u.name AS "nome", u.email, u.plan_status AS "situacao",
+                 u.is_test::int AS "conta_de_teste",
                  coalesce(u.plan_cycle,'') AS "plano",
                  to_char(u.created_at AT TIME ZONE 'America/Sao_Paulo','YYYY-MM-DD') AS "criada_em",
                  coalesce(to_char(u.trial_ends_at AT TIME ZONE 'America/Sao_Paulo','YYYY-MM-DD'),'') AS "trial_ate",

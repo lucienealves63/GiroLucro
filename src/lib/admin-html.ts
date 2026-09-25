@@ -81,6 +81,10 @@ td.num,th.num{text-align:right;padding-right:0}
 .tag.trial{background:rgba(251,191,36,.14);color:#fbbf24}
 .tag.pago{background:rgba(184,245,60,.15);color:#b8f53c}
 .tag.morto{background:rgba(251,113,133,.13);color:#fb7185}
+.tag.teste{background:rgba(56,189,248,.15);color:#7dd3fc}
+.inp{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);border-radius:11px;padding:9px 12px;color:#fafafa;font-size:12.5px;font-family:inherit;min-width:210px}
+.inp::placeholder{color:#52525b}
+.inp:focus{outline:none;border-color:rgba(184,245,60,.55)}
 .msg{border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:14px 15px;margin-bottom:10px;background:rgba(255,255,255,.025)}
 .msg summary{cursor:pointer;list-style:none;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .msg summary::-webkit-details-marker{display:none}

@@ -68,7 +68,14 @@ function formatDate(iso: string | null): string {
  * "cancelar assinatura"; existe pedido de reembolso (CDC art. 49) e, em outro
  * lugar, exclusão da conta.
  */
-export function MyPurchaseSection({ purchase }: { purchase: PurchaseInfo }) {
+export function MyPurchaseSection({
+  purchase,
+  isTestAccount = false,
+}: {
+  purchase: PurchaseInfo;
+  /** Conta de teste não compra nada: o acesso é liberado sem cobrança. */
+  isTestAccount?: boolean;
+}) {
   const router = useRouter();
   const { msg, show } = useToast();
   const [pending, start] = useTransition();
@@ -110,17 +117,30 @@ export function MyPurchaseSection({ purchase }: { purchase: PurchaseInfo }) {
             Nenhuma compra registrada nesta conta
           </p>
           <p className="mt-1.5 text-[12px] leading-relaxed text-zinc-400">
-            O GiroLucro Pro é uma compra de <strong className="text-zinc-200">pagamento único</strong>{" "}
-            ({PRO_PRICE_LABEL}) — {PRO_PAYMENT_LINES.join(" · ").toLowerCase()}. Enquanto você não
-            compra, o acesso fica no período gratuito.
+            {isTestAccount ? (
+              <>
+                Esta é uma <strong className="text-zinc-200">conta de teste</strong>: o Pro fica
+                liberado sem cobrança e nenhum checkout é aberto — não há o que comprar nem
+                reembolsar.
+              </>
+            ) : (
+              <>
+                O GiroLucro Pro é uma compra de{" "}
+                <strong className="text-zinc-200">pagamento único</strong> ({PRO_PRICE_LABEL}) —{" "}
+                {PRO_PAYMENT_LINES.join(" · ").toLowerCase()}. Enquanto você não compra, o acesso
+                fica no período gratuito.
+              </>
+            )}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Link
-              href="/assinatura"
-              className="pressable rounded-2xl bg-volt-400 px-4 py-2.5 text-[12.5px] font-bold text-ink-950"
-            >
-              Ver o Pro
-            </Link>
+            {!isTestAccount && (
+              <Link
+                href="/assinatura"
+                className="pressable rounded-2xl bg-volt-400 px-4 py-2.5 text-[12.5px] font-bold text-ink-950"
+              >
+                Ver o Pro
+              </Link>
+            )}
             <Link
               href="/ajuda/compra-e-reembolso"
               className="pressable rounded-2xl border border-white/[0.12] bg-white/[0.03] px-4 py-2.5 text-[12.5px] font-bold text-zinc-200"

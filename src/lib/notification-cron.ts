@@ -75,6 +75,8 @@ async function notifyTrialExpiring() {
     .where(
       and(
         eq(users.planStatus, "trialing"),
+        // conta de teste não tem trial correndo: nunca avisar sobre vencimento
+        eq(users.isTest, false),
         gte(users.trialEndsAt, now),
         lt(users.trialEndsAt, inTwoDays),
       ),
@@ -121,9 +123,12 @@ async function notifyTrialExpiring() {
  * Notifica usuários com manutenção urgente/vencida.
  */
 async function notifyMaintenanceUrgent() {
-  // Busca todos os usuários com push subscriptions
-  const allSubs = await db.selectDistinct({ userId: pushSubscriptions.userId })
-    .from(pushSubscriptions);
+  // Busca todos os usuários com push subscriptions (contas de teste ficam de fora)
+  const allSubs = await db
+    .selectDistinct({ userId: pushSubscriptions.userId })
+    .from(pushSubscriptions)
+    .innerJoin(users, eq(users.id, pushSubscriptions.userId))
+    .where(eq(users.isTest, false));
 
   for (const row of allSubs) {
     const userId = row.userId;
@@ -178,9 +183,10 @@ async function notifyMaintenanceUrgent() {
  * Notifica usuários às 08h sobre meta do dia.
  */
 async function notifyDailyGoal() {
-  const allUsers = await db.select({ id: users.id, name: users.name })
+  const allUsers = await db
+    .select({ id: users.id, name: users.name })
     .from(users)
-    .where(eq(users.planStatus, "active"));
+    .where(and(eq(users.planStatus, "active"), eq(users.isTest, false)));
 
   for (const user of allUsers) {
     const subs = await db

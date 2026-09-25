@@ -9,7 +9,7 @@ import {
   makeAdminCookieValue,
   verifyAdminFormCsrf,
 } from "@/lib/admin-auth";
-import { esc, layout, loginPage } from "@/lib/admin-html";
+import { esc, layout, loginPage, note } from "@/lib/admin-html";
 import { buildReport, reportJson, type Report } from "@/lib/admin-report";
 import {
   setupNeeded,
@@ -24,6 +24,7 @@ import {
 import { resolveRangeDays } from "@/lib/analytics";
 import { logDataSubjectRequest } from "@/lib/account";
 import { refundOutcomeEmail, sendTransactionalEmail } from "@/lib/email";
+import { setTestAccountByEmail, setTestAccountById } from "@/lib/test-accounts";
 import { getAppUrl, getAppUrlSource } from "@/lib/password-reset";
 
 export const dynamic = "force-dynamic";
@@ -162,27 +163,7 @@ export async function GET(req: Request) {
   const flash = url.searchParams.get("ok");
 
   const body =
-    (flash
-      ? noteOk(
-          flash === "sent"
-            ? "Mensagem registrada com sucesso."
-            : flash === "answered"
-              ? "Mensagem marcada como respondida."
-              : flash === "archived"
-                ? "Mensagem arquivada."
-                : flash === "deleted"
-                  ? "Mensagem excluída."
-                  : flash === "refunded"
-                    ? "Reembolso registrado: acesso encerrado e e-mail de confirmação enviado."
-                    : flash === "refunded_noemail"
-                      ? "Reembolso registrado e acesso encerrado. E-mail não enviado (Resend não configurado)."
-                      : flash === "denied"
-                        ? "Pedido recusado: a pessoa foi avisada por e-mail e o acesso continua ativo."
-                        : flash === "denied_noemail"
-                          ? "Pedido recusado. E-mail não enviado (Resend não configurado) — avise a pessoa manualmente."
-                          : "Feito.",
-        )
-      : "") +
+    flashNote(flash) +
     (report.problems.length && tab !== "diagnostico" && !tabRendersSetupCallout(tab)
       ? setupNeeded(report, tokenQs)
       : "") +
@@ -191,7 +172,7 @@ export async function GET(req: Request) {
       : tab === "desempenho"
         ? viewPerformance(report, tokenQs)
         : tab === "assinantes"
-          ? viewSubscribers(report, tokenQs)
+          ? viewSubscribers(report, access.csrf, tokenQs)
           : tab === "pedidos"
             ? viewRequests(report, access.csrf, tokenRaw ?? "")
             : tab === "contato"
@@ -230,6 +211,45 @@ export async function GET(req: Request) {
 
 function noteOk(message: string): string {
   return `<div class="note ok"><b>${esc(message)}</b></div>`;
+}
+
+/** Frases do aviso do topo do painel (o `ok` que volta na URL após a ação). */
+const FLASH_MESSAGES: Record<string, string> = {
+  sent: "Mensagem registrada com sucesso.",
+  answered: "Mensagem marcada como respondida.",
+  archived: "Mensagem arquivada.",
+  deleted: "Mensagem excluída.",
+  refunded: "Reembolso registrado: acesso encerrado e e-mail de confirmação enviado.",
+  refunded_noemail:
+    "Reembolso registrado e acesso encerrado. E-mail não enviado (Resend não configurado).",
+  denied: "Pedido recusado: a pessoa foi avisada por e-mail e o acesso continua ativo.",
+  denied_noemail:
+    "Pedido recusado. E-mail não enviado (Resend não configurado) — avise a pessoa manualmente.",
+  test_on:
+    "Conta marcada como conta de teste: Pro liberado sem cobrança e fora das estatísticas.",
+  test_off:
+    "Conta voltou a ser uma conta comum: acesso e estatísticas seguem as regras normais.",
+  test_same: "Nada mudou: a conta já estava nesse estado.",
+};
+
+/** Aviso do topo (erro ou confirmação) depois de uma ação do painel. */
+function flashNote(flash: string | null): string {
+  if (!flash) return "";
+  if (flash === "test_notfound") {
+    return note(
+      "err",
+      "Conta não encontrada",
+      "Nenhuma conta no app usa esse e-mail. Confira a grafia e tente de novo — a marcação vale para quem já criou a conta.",
+    );
+  }
+  if (flash === "test_invalid") {
+    return note(
+      "err",
+      "Faltou o e-mail",
+      "Digite o e-mail completo da conta que deve virar conta de teste.",
+    );
+  }
+  return noteOk(FLASH_MESSAGES[flash] ?? "Feito.");
 }
 
 export async function POST(req: Request) {
@@ -276,8 +296,9 @@ export async function POST(req: Request) {
     return html(loginPage("Formulário expirado. Recarregue o painel e tente de novo."), 400);
   }
 
-  const id = Number(form.get("id"));
-  if (!Number.isInteger(id) || id <= 0) return back("erro");
+  const id = Number(form.get("id") ?? NaN);
+  // As ações de conta de teste também aceitam `email` (o id é opcional nelas).
+  if ((!Number.isInteger(id) || id <= 0) && action !== "test_add") return back("erro");
 
   try {
     switch (action) {
@@ -296,6 +317,27 @@ export async function POST(req: Request) {
       case "delete":
         await db.delete(contactMessages).where(eq(contactMessages.id, id));
         return back("deleted");
+      /**
+       * Conta de teste: acesso Pro liberado sem cobrança e fora das métricas.
+       * Aceita `id` (botão na lista de cadastros) ou `email` (campo do card),
+       * para dar conta de marcar qualquer conta, não só as recentes.
+       */
+      case "test_add": {
+        const email = String(form.get("email") ?? "").trim();
+        const hasId = Number.isInteger(id) && id > 0;
+        if (!hasId && !email) return back("test_invalid");
+        const result = hasId
+          ? await setTestAccountById(id, true)
+          : await setTestAccountByEmail(email, true);
+        if (!result) return back("test_notfound");
+        return back(result.changed ? "test_on" : "test_same");
+      }
+      case "test_remove": {
+        if (!Number.isInteger(id) || id <= 0) return back("test_invalid");
+        const result = await setTestAccountById(id, false);
+        if (!result) return back("test_notfound");
+        return back(result.changed ? "test_off" : "test_same");
+      }
       case "refund_settle": {
         // Fila manual de reembolso: o dinheiro é devolvido no painel do provedor
         // e aqui a gente fecha o caso no app (acesso + registro + e-mail).

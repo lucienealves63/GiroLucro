@@ -126,6 +126,8 @@ export async function runRefundWindowReminders(
       and(
         eq(users.planStatus, "active"),
         eq(users.paymentStatus, "approved"),
+        // conta de teste não passou por compra: nada de lembrete de reembolso
+        eq(users.isTest, false),
         isNull(users.deletedAt),
         isNotNull(users.paidAt),
         gte(users.paidAt, from),

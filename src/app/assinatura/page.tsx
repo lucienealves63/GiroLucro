@@ -1,6 +1,7 @@
 import { BillingClient } from "@/components/billing";
-import { hasAccess, requireUser, trialDaysLeft } from "@/lib/auth";
+import { requireUser, trialDaysLeft } from "@/lib/auth";
 import { PLANS, PRO_FEATURES } from "@/lib/billing";
+import { isTestAccount } from "@/lib/test-accounts";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,7 @@ export default async function AssinaturaPage() {
       plans={PLANS}
       features={PRO_FEATURES}
       status={status}
+      isTestAccount={isTestAccount(user)}
       trialDaysLeft={trial}
       periodEnd={
         user.currentPeriodEnd

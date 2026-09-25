@@ -11,6 +11,7 @@ import {
   Database,
   Eye,
   EyeOff,
+  FlaskConical,
   Fuel,
   Gauge,
   LifeBuoy,
@@ -69,7 +70,14 @@ export function SettingsClient({
   pushDevices,
   pushConfigured,
 }: {
-  account: { name: string; email: string; planLabel: string; isPro: boolean };
+  account: {
+    name: string;
+    email: string;
+    planLabel: string;
+    isPro: boolean;
+    /** Conta de teste (dono/QA): acesso liberado sem cobrança e fora das métricas. */
+    isTest?: boolean;
+  };
   settings: SettingsForm;
   costPerKm: number;
   monthlyFixed: number;
@@ -260,15 +268,31 @@ export function SettingsClient({
               <p className="min-w-0 flex-1 truncate text-[12px] font-semibold text-zinc-200">
                 {account.planLabel}
               </p>
-              {!account.isPro && (
-                <Link
-                  href="/assinatura"
-                  className="pressable shrink-0 rounded-xl bg-volt-400 px-3 py-1.5 text-[11px] font-bold text-ink-950"
-                >
-                  Virar Pro
-                </Link>
+              {account.isTest ? (
+                <span className="shrink-0 rounded-xl border border-sky-400/30 bg-sky-400/10 px-3 py-1.5 text-[11px] font-bold text-sky-300">
+                  teste
+                </span>
+              ) : (
+                !account.isPro && (
+                  <Link
+                    href="/assinatura"
+                    className="pressable shrink-0 rounded-xl bg-volt-400 px-3 py-1.5 text-[11px] font-bold text-ink-950"
+                  >
+                    Virar Pro
+                  </Link>
+                )
               )}
             </div>
+            {account.isTest && (
+              <p className="mt-3 flex items-start gap-2 rounded-2xl border border-sky-400/25 bg-sky-400/[0.07] px-3.5 py-3 text-[11.5px] leading-relaxed text-sky-200">
+                <FlaskConical className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span>
+                  Conta de teste: o Pro fica liberado <strong className="text-sky-100">sem
+                  cobrança</strong> e esta conta fica <strong className="text-sky-100">fora das
+                  estatísticas</strong> do painel (cadastros, conversão, pagantes e receita).
+                </span>
+              </p>
+            )}
             <Link
               href="/contato"
               className="pressable mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.03] py-3 text-[13px] font-bold text-zinc-300"
@@ -645,7 +669,7 @@ export function SettingsClient({
         </button>
 
         {/* minha compra — pagamento único, arrependimento e reembolso */}
-        <MyPurchaseSection purchase={purchase} />
+        <MyPurchaseSection purchase={purchase} isTestAccount={account.isTest === true} />
 
         {/* notificações: ativar/desativar com controle do usuário */}
         <NotificationSettingsSection devices={pushDevices} configured={pushConfigured} />

@@ -9,6 +9,7 @@ import {
   Check,
   Copy,
   Crown,
+  FlaskConical,
   Loader2,
   QrCode,
   ShieldCheck,
@@ -39,6 +40,7 @@ export function BillingClient({
   plans,
   features,
   status,
+  isTestAccount = false,
   trialDaysLeft,
   periodEnd,
   cycle,
@@ -47,6 +49,8 @@ export function BillingClient({
   plans: Plan[];
   features: string[];
   status: "active" | "trialing" | "pending" | "expired" | "canceled";
+  /** Conta de teste: Pro liberado sem cobrança e fora das estatísticas do painel. */
+  isTestAccount?: boolean;
   trialDaysLeft: number | null;
   periodEnd: string | null;
   cycle: string | null;
@@ -208,10 +212,16 @@ export function BillingClient({
     <div className="px-5 pb-10">
       <header className="flex items-center justify-between pb-6 pt-6">
         <Logo />
-        {status === "active" && (
-          <span className="flex items-center gap-1.5 rounded-full border border-volt-400/30 bg-volt-400/10 px-3 py-1.5 text-[10.5px] font-bold text-volt-300">
-            <Crown className="h-3.5 w-3.5" /> PRO
+        {isTestAccount ? (
+          <span className="flex items-center gap-1.5 rounded-full border border-sky-400/30 bg-sky-400/10 px-3 py-1.5 text-[10.5px] font-bold text-sky-300">
+            <FlaskConical className="h-3.5 w-3.5" /> CONTA DE TESTE
           </span>
+        ) : (
+          status === "active" && (
+            <span className="flex items-center gap-1.5 rounded-full border border-volt-400/30 bg-volt-400/10 px-3 py-1.5 text-[10.5px] font-bold text-volt-300">
+              <Crown className="h-3.5 w-3.5" /> PRO
+            </span>
+          )
         )}
       </header>
 
@@ -220,7 +230,19 @@ export function BillingClient({
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 90, damping: 18 }}
       >
-        {status === "active" ? (
+        {isTestAccount ? (
+          <>
+            <h1 className="font-display text-[28px] font-bold leading-tight tracking-tight text-zinc-50">
+              Conta de teste, {firstName}.
+            </h1>
+            <p className="mt-2 text-[13.5px] leading-relaxed text-zinc-400">
+              O Pro está liberado nesta conta <strong className="text-zinc-200">sem cobrança</strong>{" "}
+              e sem prazo: nada é faturado, nenhum checkout é aberto e esta conta fica{" "}
+              <strong className="text-zinc-200">fora das estatísticas</strong> do painel
+              (cadastros, conversão, pagantes, receita e funil). Use à vontade para testar o app.
+            </p>
+          </>
+        ) : status === "active" ? (
           <>
             <h1 className="font-display text-[28px] font-bold leading-tight tracking-tight text-zinc-50">
               Você é Pro, {firstName}.
@@ -283,7 +305,8 @@ export function BillingClient({
         )}
       </motion.div>
 
-      {/* plano único */}
+      {/* plano único — não aparece em conta de teste (nada é cobrado) */}
+      {!isTestAccount && (
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -315,6 +338,7 @@ export function BillingClient({
           <Check className="h-4 w-4 text-ink-950" strokeWidth={3} />
         </span>
       </motion.div>
+      )}
 
       <motion.div
         initial={{ opacity: 0 }}
@@ -335,7 +359,7 @@ export function BillingClient({
         </ul>
       </motion.div>
 
-      {status !== "active" && (
+      {!isTestAccount && status !== "active" && (
         <>
           <button
             onClick={activate}
@@ -361,7 +385,7 @@ export function BillingClient({
         </>
       )}
 
-      {pix && (
+      {!isTestAccount && pix && (
         <motion.div
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
@@ -479,12 +503,14 @@ export function BillingClient({
         </p>
       </div>
 
-      <p className="mt-4 flex items-start justify-center gap-1.5 text-center text-[10.5px] leading-relaxed text-zinc-500">
-        <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-        Pagamento seguro via Mercado Pago. Valor único de {brl(plan.price)} — sem
-        mensalidade e sem renovação automática. O acesso é liberado por tempo
-        indeterminado, enquanto o serviço existir.
-      </p>
+      {!isTestAccount && (
+        <p className="mt-4 flex items-start justify-center gap-1.5 text-center text-[10.5px] leading-relaxed text-zinc-500">
+          <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          Pagamento seguro via Mercado Pago. Valor único de {brl(plan.price)} — sem
+          mensalidade e sem renovação automática. O acesso é liberado por tempo
+          indeterminado, enquanto o serviço existir.
+        </p>
+      )}
 
       <Toast msg={msg} />
     </div>

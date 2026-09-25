@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { getSessionUser } from "@/lib/auth";
 import { DEFAULT_PLAN, resolvePlan } from "@/lib/billing";
+import { isTestAccount } from "@/lib/test-accounts";
 import {
   PIX_QR_MINUTES,
   createPixCharge,
@@ -17,6 +18,19 @@ export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
     if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+
+    // Conta de teste: o Pro já está liberado — nunca gerar QR/cobrança para ela.
+    if (isTestAccount(user)) {
+      return NextResponse.json(
+        {
+          error:
+            "Esta é uma conta de teste: o Pro já está liberado sem cobrança e nenhum Pix é gerado.",
+          code: "test_account",
+          testAccount: true,
+        },
+        { status: 409 },
+      );
+    }
 
     const body = await req.json().catch(() => ({}));
     const plan = resolvePlan(typeof body.cycle === "string" ? body.cycle : DEFAULT_PLAN.id);

@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { getSessionUser, hasAccess } from "@/lib/auth";
 import { DEFAULT_PLAN, resolvePlan } from "@/lib/billing";
+import { isTestAccount } from "@/lib/test-accounts";
 import { sendPurchaseReceipt } from "@/lib/purchase";
 import {
   billingDemoEnabled,
@@ -17,6 +18,19 @@ export async function POST(req: Request) {
   try {
     const user = await getSessionUser();
     if (!user) return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+
+    // Conta de teste: o Pro já está liberado — nunca abrir cobrança para ela.
+    if (isTestAccount(user)) {
+      return NextResponse.json(
+        {
+          error:
+            "Esta é uma conta de teste: o Pro já está liberado sem cobrança e nenhum pagamento é gerado.",
+          code: "test_account",
+          testAccount: true,
+        },
+        { status: 409 },
+      );
+    }
 
     const body = await req.json().catch(() => ({}));
     // Aceita qualquer cycle enviado; sempre resolve para o plano único (pagamento único).
