@@ -2,6 +2,7 @@ import { RegisterClient, type RegisterItem } from "@/components/register";
 import { requireUser } from "@/lib/auth";
 import { computeRange, costPerKm } from "@/lib/calculations";
 import { getAppData } from "@/lib/data";
+import { fuelLine, stationStats } from "@/lib/fuel";
 import {
   EXPENSE_META,
   hrs,
@@ -48,22 +49,57 @@ export default async function RegistrarPage() {
       }),
     ...data.expenses
       .filter((e) => e.date === today)
-      .map((x) => ({
-        id: x.id,
-        kind: "expense" as const,
-        label: EXPENSE_META[x.type]?.label ?? "Gasto",
-        sub: x.note ?? "",
-        amount: x.amount,
-        positive: false,
-        platform: x.type,
-        when: timeAgo(x.date, today),
-        createdAt: new Date(x.createdAt).getTime(),
-      })),
+      .map((x) => {
+        const fuel = x.type === "combustivel" ? fuelLine(x) : "";
+        return {
+          id: x.id,
+          kind: "expense" as const,
+          label: EXPENSE_META[x.type]?.label ?? "Gasto",
+          sub: [fuel, x.note].filter(Boolean).join(" · "),
+          amount: x.amount,
+          positive: false,
+          platform: x.type,
+          when: timeAgo(x.date, today),
+          createdAt: new Date(x.createdAt).getTime(),
+        };
+      }),
   ].sort((a, b) => b.createdAt - a.createdAt);
 
   const grossToday = data.entries
     .filter((e) => e.date === today)
     .reduce((a, e) => a + e.gross, 0);
+
+  // postos já usados (atalho no formulário) + líder do ranking de 30 dias
+  const byStation = new Map<string, { label: string; uses: number; lastUsed: string }>();
+  for (const x of data.expenses) {
+    if (x.type !== "combustivel" || !x.station?.trim()) continue;
+    const label = x.station.trim();
+    const key = label.toLowerCase();
+    const cur = byStation.get(key);
+    if (!cur) {
+      byStation.set(key, { label, uses: 1, lastUsed: x.date });
+      continue;
+    }
+    cur.uses += 1;
+    if (x.date >= cur.lastUsed) {
+      cur.lastUsed = x.date;
+      cur.label = label;
+    }
+  }
+  const stations = [...byStation.values()]
+    .sort((a, b) => b.uses - a.uses || (a.lastUsed < b.lastUsed ? 1 : -1))
+    .map((v, i) => ({ key: `st-${i}`, label: v.label, uses: v.uses, lastUsed: v.lastUsed }));
+
+  const ranking30 = stationStats(data.expenses, new Set(lastNDays(today, 30)), 30);
+  const leader = ranking30.best;
+  const bestStation =
+    leader && ranking30.stations.length >= 2
+      ? {
+          label: leader.label,
+          costPerKm: leader.costPerKm,
+          pricePerLiter: leader.pricePerLiter,
+        }
+      : null;
 
   return (
     <RegisterClient
@@ -80,6 +116,8 @@ export default async function RegistrarPage() {
       grossToday={grossToday}
       hasBaselines={range14.hours >= 3}
       platforms={platforms}
+      stations={stations}
+      bestStation={bestStation}
     />
   );
 }

@@ -9,6 +9,10 @@
 
 - **Lucro líquido real** — desconta combustível (estimado por km ou real abastecido),
   provisão de manutenção por km, custos fixos rateados por dia, marmita e emergências
+- **Combustível por posto** (`/postos`) — lance posto, litros e odômetro em cada
+  abastecimento e veja **qual posto deixa mais lucro líquido**: R$/litro, km/l medido
+  por posto e o ranking por **R$/km** (R$/litro ÷ km/l), com quanto cada posto tirou do
+  seu lucro no período e a projeção mensal dessa diferença
 - **Comparativo de plataformas** — Uber × 99 × iFood × Rappi × entregas diretas:
   R$ líquido por hora, por km e **por entrega**, com custo rateado proporcionalmente
 - **Tempo de espera** — quanto você perde "mofando" em restaurante e quanto renderia sem isso
@@ -51,6 +55,18 @@ npm run dev
 
 Abra http://localhost:3000 → crie sua conta → carregue os **dados de exemplo**
 (botão na tela inicial) para explorar o app completo.
+
+### Verificações
+
+```bash
+npm run typecheck   # TypeScript estrito
+npm run lint        # ESLint
+npm test            # Jest — não precisa de banco: os testes sobem um
+                    # Postgres em memória (pg-mem) com o schema real do app
+```
+
+`npm run build` baixa as fontes do Google (`next/font`); sem internet na máquina
+essa etapa falha antes de compilar as páginas.
 
 ## Deploy (Vercel + Neon)
 

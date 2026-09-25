@@ -11,6 +11,7 @@ import {
   maintenanceStatuses,
 } from "@/lib/calculations";
 import { getAppData } from "@/lib/data";
+import { fuelLine, stationInsights } from "@/lib/fuel";
 import {
   EXPENSE_META,
   brl,
@@ -71,17 +72,20 @@ export default async function Home() {
         createdAt: new Date(e.createdAt).getTime(),
       };
     }),
-    ...data.expenses.map((x) => ({
-      id: x.id,
-      kind: "expense" as const,
-      label: EXPENSE_META[x.type]?.label ?? "Gasto",
-      sub: x.note ?? "",
-      amount: x.amount,
-      positive: false,
-      platform: x.type,
-      when: timeAgo(x.date, today),
-      createdAt: new Date(x.createdAt).getTime(),
-    })),
+    ...data.expenses.map((x) => {
+      const fuel = x.type === "combustivel" ? fuelLine(x) : "";
+      return {
+        id: x.id,
+        kind: "expense" as const,
+        label: EXPENSE_META[x.type]?.label ?? "Gasto",
+        sub: [fuel, x.note].filter(Boolean).join(" · "),
+        amount: x.amount,
+        positive: false,
+        platform: x.type,
+        when: timeAgo(x.date, today),
+        createdAt: new Date(x.createdAt).getTime(),
+      };
+    }),
   ]
     .sort((a, b) => b.createdAt - a.createdAt)
     .slice(0, 8);
@@ -119,7 +123,10 @@ export default async function Home() {
       remainingKm: a.remainingKm,
       status: a.status,
     })),
-    insights: buildInsights(today, data.entries, data.expenses, s),
+    insights: [
+      ...buildInsights(today, data.entries, data.expenses, s),
+      ...stationInsights(data.expenses, last7Days(today), s),
+    ].slice(0, 6),
     recents,
     fuelMode: s.fuelMode,
     fixedToday: todayStats.fixedShare,
