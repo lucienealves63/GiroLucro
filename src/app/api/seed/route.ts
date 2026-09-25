@@ -56,6 +56,16 @@ export async function POST(req: Request) {
     let odo = 12000;
     let kmSinceFuel = 0;
 
+    // postos da demo: preço do litro × rendimento do combustível de cada um.
+    // O "Posto do Zé" é barato mas rende pouco; o Shell custa mais e rende mais —
+    // no custo por km o Shell ganha, que é exatamente o que /postos mostra.
+    const STATIONS = [
+      { name: "Posto Shell Centro", price: 5.89, kml: 37 },
+      { name: "Posto do Zé", price: 5.39, kml: 30 },
+      { name: "Ipiranga Av. Brasil", price: 5.69, kml: 35 },
+    ];
+    let fuelIdx = 0;
+
     // r$/h por plataforma/período
     const rates: Record<string, Record<string, [number, number]>> = {
       uber: { manha: [22, 30], tarde: [20, 27], noite: [27, 38], madrugada: [24, 33] },
@@ -143,14 +153,20 @@ export async function POST(req: Request) {
         });
       }
 
-      // combustível a cada ~150 km
+      // combustível a cada ~150 km, alternando entre 3 postos com preços e
+      // qualidades diferentes — é o que faz o ranking de /postos ter o que mostrar
       if (kmSinceFuel > 150) {
+        const stationIdx = fuelIdx++ % STATIONS.length;
+        const st = STATIONS[stationIdx];
+        const liters = r2(kmSinceFuel / st.kml);
         expenseRows.push({
           userId: uid,
           date: dateStr,
           type: "combustivel",
-          amount: r2(between(25, 42)),
+          amount: r2(liters * st.price),
           odometer: Math.round(odo),
+          station: st.name,
+          liters,
         });
         kmSinceFuel = 0;
       }

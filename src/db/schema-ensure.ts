@@ -74,6 +74,8 @@ export const STATEMENTS: SetupStatement[] = [
       "type" text NOT NULL,
       "amount" numeric(10, 2) NOT NULL,
       "odometer" numeric(10, 1),
+      "station" text,
+      "liters" numeric(8, 2),
       "note" text,
       "created_at" timestamp with time zone DEFAULT now() NOT NULL
     )`,
@@ -340,6 +342,11 @@ export const STATEMENTS: SetupStatement[] = [
     kind: "index",
     sql: `CREATE INDEX IF NOT EXISTS "data_subject_requests_type_idx" ON "data_subject_requests" USING btree ("request_type", "created_at")`,
   },
+  {
+    name: "expenses_user_station_idx",
+    kind: "index",
+    sql: `CREATE INDEX IF NOT EXISTS "expenses_user_station_idx" ON "expenses" USING btree ("user_id", "station")`,
+  },
   // Migration: bancos antigos (tabela settings já existia sem a coluna)
   {
     name: "settings.platforms_json",
@@ -348,6 +355,19 @@ export const STATEMENTS: SetupStatement[] = [
     column: "platforms_json",
     sql: `ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "platforms_json" text`,
   },
+  // Migration: combustível por posto (colunas novas em `expenses`)
+  ...(
+    [
+      ["station", `text`],
+      ["liters", `numeric(8, 2)`],
+    ] as const
+  ).map(([column, type]) => ({
+    name: `expenses.${column}`,
+    kind: "column" as const,
+    table: "expenses",
+    column,
+    sql: `ALTER TABLE "expenses" ADD COLUMN IF NOT EXISTS "${column}" ${type}`,
+  })),
   // Migration LGPD/aceite/compras: colunas novas em `users`
   ...(
     [

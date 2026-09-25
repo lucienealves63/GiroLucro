@@ -228,6 +228,8 @@ export function Dashboard({ vm }: { vm: DashboardVM }) {
                         : `Combustível (estim. ${fmtKm(d.km)})`
                     }
                     value={-d.fuelCost}
+                    href="/postos"
+                    hint="postos"
                   />
                   <CostRow
                     icon={<Wrench className="h-3.5 w-3.5 text-orange-400" />}
@@ -456,18 +458,28 @@ function CostRow({
   label,
   value,
   positive,
+  href,
+  hint,
 }: {
   icon: React.ReactNode;
   label: string;
   value: number;
   positive?: boolean;
+  /** torna a linha um atalho (ex.: combustível → ranking de postos) */
+  href?: string;
+  hint?: string;
 }) {
-  return (
-    <div className="flex items-center gap-2.5">
+  const content = (
+    <>
       <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-white/[0.05]">
         {icon}
       </span>
-      <span className="min-w-0 truncate text-[12.5px] text-zinc-400">{label}</span>
+      <span className="min-w-0 truncate text-[12.5px] text-zinc-400">
+        {label}
+        {hint && (
+          <span className="ml-1.5 text-[10.5px] font-bold text-amber-300/80">{hint}</span>
+        )}
+      </span>
       <span
         className={clsx(
           "tabular ml-auto text-[13px] font-semibold",
@@ -476,8 +488,17 @@ function CostRow({
       >
         {positive ? `+ ${brl(value)}` : `− ${brl(Math.abs(value))}`}
       </span>
-    </div>
+    </>
   );
+
+  if (href) {
+    return (
+      <Link href={href} className="pressable -mx-1 flex items-center gap-2.5 rounded-xl px-1">
+        {content}
+      </Link>
+    );
+  }
+  return <div className="flex items-center gap-2.5">{content}</div>;
 }
 
 function Stat({

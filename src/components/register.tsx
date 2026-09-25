@@ -7,6 +7,7 @@ import {
   Backpack,
   Check,
   Clock3,
+  Crown,
   Fuel,
   LifeBuoy,
   MoreHorizontal,
@@ -44,6 +45,14 @@ export interface RegisterItem {
   platform: string;
   when: string;
   createdAt: number;
+}
+
+/** Postos já usados (preenchimento rápido no lançamento de combustível). */
+export interface StationSuggestion {
+  key: string;
+  label: string;
+  uses: number;
+  lastUsed: string;
 }
 
 type Tab = "ganho" | "combustivel" | "alimentacao" | "borracharia" | "equipamento" | "outro";
@@ -99,6 +108,8 @@ export function RegisterClient({
   grossToday,
   hasBaselines,
   platforms,
+  stations = [],
+  bestStation,
 }: {
   today: string;
   avgPerKm: number;
@@ -109,6 +120,9 @@ export function RegisterClient({
   grossToday: number;
   hasBaselines: boolean;
   platforms: PlatformMeta[];
+  stations?: StationSuggestion[];
+  /** Posto que deixa mais lucro líquido (dica no lançamento). */
+  bestStation?: { label: string; costPerKm: number | null; pricePerLiter: number | null } | null;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("ganho");
@@ -136,6 +150,9 @@ export function RegisterClient({
   const [expAmount, setExpAmount] = useState("");
   const [odometer, setOdometer] = useState("");
   const [note, setNote] = useState("");
+  // combustível por posto
+  const [station, setStation] = useState("");
+  const [liters, setLiters] = useState("");
 
   // vale a pena
   const [vpValor, setVpValor] = useState("");
@@ -205,6 +222,8 @@ export function RegisterClient({
     const a = parseBR(expAmount);
     if (a <= 0) return;
     if (tab === "ganho") return;
+    const isFuel = tab === "combustivel";
+    const lts = isFuel ? parseBR(liters) : 0;
     start(async () => {
       const res = await fetch("/api/expenses", {
         method: "POST",
@@ -213,18 +232,24 @@ export function RegisterClient({
           date: today,
           type: tab,
           amount: a,
-          odometer: tab === "combustivel" && odometer ? parseBR(odometer) : null,
+          odometer: isFuel && odometer ? parseBR(odometer) : null,
+          station: isFuel && station.trim() ? station.trim() : null,
+          liters: isFuel && lts > 0 ? lts : null,
           note: note ? note : null,
         }),
       });
       if (res.ok) {
-        show(`Gasto salvo: − ${brl(a)}`);
-        setExpAmount(""); setOdometer(""); setNote("");
+        show(
+          isFuel && station.trim()
+            ? `Abastecimento no ${station.trim()} salvo: − ${brl(a)}`
+            : `Gasto salvo: − ${brl(a)}`,
+        );
+        setExpAmount(""); setOdometer(""); setNote(""); setLiters("");
         setVoiceHint(null);
         router.refresh();
       }
     });
-  }, [expAmount, tab, today, odometer, note, router, show, start]);
+  }, [expAmount, tab, today, odometer, note, station, liters, router, show, start]);
 
   const applyVoiceCommand = useCallback(
     (cmd: VoiceCommandResult) => {
@@ -243,6 +268,7 @@ export function RegisterClient({
         setExpAmount("");
         setOdometer("");
         setNote("");
+        setLiters("");
         setVoiceHint(null);
         show("Campos limpos");
         return;
@@ -280,8 +306,16 @@ export function RegisterClient({
       if (!isGain || (cmd.tab && cmd.tab !== "ganho" && !cmd.platform)) {
         if (cmd.amount != null) setExpAmount(brlVoice(cmd.amount));
         if (cmd.note) setNote(cmd.note);
+        if (cmd.station) setStation(cmd.station);
         if (cmd.km != null && (cmd.tab === "combustivel" || targetTab === "combustivel")) {
           setOdometer(brlVoice(cmd.km));
+        }
+        // "7 litros" dita o volume do abastecimento
+        if (
+          cmd.liters != null &&
+          (cmd.tab === "combustivel" || targetTab === "combustivel")
+        ) {
+          setLiters(brlVoice(cmd.liters));
         }
       }
 
@@ -347,6 +381,9 @@ export function RegisterClient({
               show("Diga o valor do gasto, ex.: \"combustível 40 reais\"");
               return;
             }
+            const isFuel = t === "combustivel";
+            const spokenStation = cmd.station ?? (station.trim() ? station.trim() : null);
+            const spokenLiters = cmd.liters ?? (parseBR(liters) > 0 ? parseBR(liters) : null);
             const res = await fetch("/api/expenses", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -355,17 +392,24 @@ export function RegisterClient({
                 type: t,
                 amount: a,
                 odometer:
-                  t === "combustivel" && (cmd.km != null || odometer)
+                  isFuel && (cmd.km != null || odometer)
                     ? (cmd.km ?? parseBR(odometer))
                     : null,
+                station: isFuel ? spokenStation : null,
+                liters: isFuel ? spokenLiters : null,
                 note: cmd.note || note || null,
               }),
             });
             if (res.ok) {
-              show(`Gasto salvo por voz: − ${brl(a)}`);
+              show(
+                isFuel && spokenStation
+                  ? `Abastecimento no ${spokenStation} salvo por voz: − ${brl(a)}`
+                  : `Gasto salvo por voz: − ${brl(a)}`,
+              );
               setExpAmount("");
               setOdometer("");
               setNote("");
+              setLiters("");
               setVoiceHint(null);
               router.refresh();
             } else {
@@ -392,6 +436,8 @@ export function RegisterClient({
       expAmount,
       odometer,
       note,
+      station,
+      liters,
       today,
       platforms,
       router,
@@ -406,10 +452,10 @@ export function RegisterClient({
         return;
       }
       setVoiceInterim(null);
-      const cmd = parseVoiceCommand(text, activePlatforms);
+      const cmd = parseVoiceCommand(text, activePlatforms, stations);
       applyVoiceCommand(cmd);
     },
-    [applyVoiceCommand, activePlatforms],
+    [applyVoiceCommand, activePlatforms, stations],
   );
 
   const del = (item: RegisterItem) => {
@@ -730,13 +776,87 @@ export function RegisterClient({
               </div>
 
               {tab === "combustivel" && (
-                <Field
-                  label="Odômetro (opcional)"
-                  suffix="km"
-                  value={odometer}
-                  onChange={setOdometer}
-                  placeholder="12.450"
-                />
+                <>
+                  <div>
+                    <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.12em] text-zinc-500">
+                      Posto
+                    </span>
+                    <input
+                      type="text"
+                      value={station}
+                      onChange={(e) => setStation(e.target.value)}
+                      placeholder="Ex: Shell da Av. Brasil"
+                      maxLength={60}
+                      className="w-full rounded-2xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-3 text-[14px] text-zinc-100 placeholder:text-zinc-700 focus:border-volt-400/40"
+                    />
+                    {stations.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {stations.slice(0, 6).map((st) => (
+                          <button
+                            key={st.key}
+                            type="button"
+                            onClick={() =>
+                              setStation((cur) =>
+                                cur.trim().toLowerCase() === st.label.trim().toLowerCase()
+                                  ? ""
+                                  : st.label,
+                              )
+                            }
+                            className={clsx(
+                              "pressable rounded-full border px-3 py-1.5 text-[11.5px] font-semibold",
+                              station.trim().toLowerCase() === st.label.trim().toLowerCase()
+                                ? "border-amber-400/50 bg-amber-400/15 text-amber-300"
+                                : "border-white/[0.08] bg-white/[0.03] text-zinc-400",
+                            )}
+                          >
+                            {st.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <Field
+                      label="Litros"
+                      suffix="L"
+                      value={liters}
+                      onChange={setLiters}
+                      placeholder="7,2"
+                    />
+                    <Field
+                      label="Odômetro"
+                      suffix="km"
+                      value={odometer}
+                      onChange={setOdometer}
+                      placeholder="12.450"
+                    />
+                  </div>
+
+                  <p className="-mt-2 text-center text-[11.5px] leading-relaxed text-zinc-500">
+                    Com posto, litros e odômetro eu calculo o{" "}
+                    <span className="text-zinc-300">R$/km de cada posto</span> e digo qual
+                    deixa mais lucro líquido.{" "}
+                    <Link href="/postos" className="font-bold text-amber-300">
+                      Ver ranking
+                    </Link>
+                  </p>
+
+                  {bestStation && (
+                    <div className="-mt-2 flex items-start gap-2.5 rounded-2xl border border-volt-400/20 bg-volt-400/[0.06] px-3.5 py-3">
+                      <Crown className="mt-0.5 h-4 w-4 shrink-0 text-volt-400" />
+                      <p className="text-[11.5px] leading-relaxed text-zinc-300">
+                        Até agora o{" "}
+                        <span className="font-bold text-volt-300">{bestStation.label}</span>{" "}
+                        é o que mais deixa lucro (
+                        {bestStation.costPerKm !== null
+                          ? `${brl(bestStation.costPerKm)}/km`
+                          : `${brl(bestStation.pricePerLiter ?? 0)}/litro`}
+                        ).
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
               {tab !== "combustivel" && (
                 <label className="block">

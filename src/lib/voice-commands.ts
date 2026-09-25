@@ -26,6 +26,10 @@ export type VoiceCommandResult = {
   quantity?: number;
   waitMinutes?: number;
   settled?: boolean;
+  /** Litros abastecidos ("combustível 40 reais 7 litros"). */
+  liters?: number;
+  /** Posto onde abasteceu (rótulo do posto já usado pelo usuário). */
+  station?: string;
   note?: string;
   action?: "save" | "clear" | "cancel";
   raw: string;
@@ -223,6 +227,26 @@ function detectPeriod(text: string): string | undefined {
   return undefined;
 }
 
+/**
+ * Posto falado no comando. Casa com os postos que o usuário já lançou
+ * ("no Shell", "posto ipiranga") — nunca inventa nome novo.
+ */
+function detectStation(
+  text: string,
+  stations?: { label: string }[] | null,
+): string | undefined {
+  if (!stations || stations.length === 0) return undefined;
+  const sorted = [...stations].sort((a, b) => b.label.length - a.label.length);
+  for (const s of sorted) {
+    const norm = normalize(s.label);
+    if (norm.length < 3) continue;
+    const escaped = norm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`(?:^|\\s)${escaped}(?:\\s|$)`, "i");
+    if (re.test(text)) return s.label;
+  }
+  return undefined;
+}
+
 function detectAction(text: string): VoiceCommandResult["action"] | undefined {
   if (/\b(salvar|salva|confirma|confirmar|registrar|registre|pronto|ok)\b/.test(text)) {
     return "save";
@@ -248,6 +272,8 @@ function formatSummary(result: Omit<VoiceCommandResult, "raw" | "summary">): str
   if (result.hours != null) bits.push(`${String(result.hours).replace(".", ",")}h`);
   if (result.km != null) bits.push(`${String(result.km).replace(".", ",")} km`);
   if (result.waitMinutes != null) bits.push(`${result.waitMinutes} min espera`);
+  if (result.liters != null) bits.push(`${String(result.liters).replace(".", ",")} L`);
+  if (result.station) bits.push(`no ${result.station}`);
   if (result.period) bits.push(result.period);
   if (result.settled === true) bits.push("já recebido");
   if (result.settled === false) bits.push("a receber");
@@ -258,6 +284,7 @@ function formatSummary(result: Omit<VoiceCommandResult, "raw" | "summary">): str
 export function parseVoiceCommand(
   transcript: string,
   userPlatforms?: { id: string; label: string }[] | null,
+  userStations?: { label: string }[] | null,
 ): VoiceCommandResult {
   const raw = transcript.trim();
   const text = normalize(raw);
@@ -267,6 +294,7 @@ export function parseVoiceCommand(
   const platform = detectPlatform(text, aliases);
   let tab = detectTab(text);
   const period = detectPeriod(text);
+  const station = detectStation(text, userStations);
 
   // Se falou de plataforma, assume ganho
   if (!tab && platform) tab = "ganho";
@@ -299,14 +327,18 @@ export function parseVoiceCommand(
     "minuto",
     "espera",
   ]);
+  const liters = numberNear(text, ["litros", "litro", "lts", "lt"]);
+
+  // posto falado conta como lançamento de combustível
+  if (!tab && station) tab = "combustivel";
 
   let amount = extractMoney(text);
   // Gasto/ganho sem unidade: pega o primeiro número se não houver amount
   if (amount == null && (tab || platform || action === "save")) {
-    // evita capturar números já usados como km/h
+    // evita capturar números já usados como km/h/litros
     const stripped = text
-      .replace(/[\d]+(?:[.,]\d+)?\s*(?:hora|horas|hr|hrs|h|quilometro|quilometros|km|entrega|entregas|corrida|corridas|giro|giros|pedido|pedidos|minuto|minutos|min)\b/gi, " ")
-      .replace(/\b(?:hora|horas|hr|hrs|h|quilometro|quilometros|km|entrega|entregas|corrida|corridas)\s*[\d]+(?:[.,]\d+)?/gi, " ");
+      .replace(/[\d]+(?:[.,]\d+)?\s*(?:hora|horas|hr|hrs|h|quilometro|quilometros|km|entrega|entregas|corrida|corridas|giro|giros|pedido|pedidos|minuto|minutos|min|litro|litros|lt|lts)\b/gi, " ")
+      .replace(/\b(?:hora|horas|hr|hrs|h|quilometro|quilometros|km|entrega|entregas|corrida|corridas|litro|litros|lt|lts)\s*[\d]+(?:[.,]\d+)?/gi, " ");
     amount = extractMoney(stripped) ?? firstLooseNumber(stripped);
   }
 
@@ -337,6 +369,8 @@ export function parseVoiceCommand(
     quantity: quantity != null ? Math.max(1, Math.round(quantity)) : undefined,
     waitMinutes: waitMinutes ?? undefined,
     settled,
+    liters: liters ?? undefined,
+    station,
     note,
     action,
   };

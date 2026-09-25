@@ -194,16 +194,29 @@ export type WorkEntry = typeof workEntries.$inferSelect;
 /**
  * Despesas do dia a dia.
  */
-export const expenses = pgTable("expenses", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id"),
-  date: text("date").notNull(), // yyyy-MM-dd
-  type: text("type").notNull(), // combustivel | alimentacao | manutencao | outro
-  amount: numeric("amount", { precision: 10, scale: 2, mode: "number" }).notNull(),
-  odometer: numeric("odometer", { precision: 10, scale: 1, mode: "number" }),
-  note: text("note"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+export const expenses = pgTable(
+  "expenses",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id"),
+    date: text("date").notNull(), // yyyy-MM-dd
+    type: text("type").notNull(), // combustivel | alimentacao | manutencao | outro
+    amount: numeric("amount", { precision: 10, scale: 2, mode: "number" }).notNull(),
+    odometer: numeric("odometer", { precision: 10, scale: 1, mode: "number" }),
+    /**
+     * Posto onde o combustível foi comprado (só usado em type=combustivel).
+     * Guardamos o nome como digitado; a comparação entre postos usa a chave
+     * normalizada de `stationKey()` (minúsculas, sem acento) — assim
+     * "Posto Shell" e "posto shell" são o mesmo posto.
+     */
+    station: text("station"),
+    /** Litros abastecidos — permite R$/litro e km/l por posto. */
+    liters: numeric("liters", { precision: 8, scale: 2, mode: "number" }),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index("expenses_user_station_idx").on(t.userId, t.station)],
+);
 
 export type Expense = typeof expenses.$inferSelect;
 
