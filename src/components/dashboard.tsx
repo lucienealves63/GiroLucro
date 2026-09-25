@@ -59,6 +59,8 @@ export interface DashboardVM {
   today: string;
   firstName: string;
   trialDaysLeft: number | null;
+  /** Conta de teste (dono/QA): acesso liberado, nada a pagar. */
+  isTestAccount?: boolean;
   dateLabel: string;
   hasAny: boolean;
   todayStats: DayStats;
@@ -114,13 +116,23 @@ export function Dashboard({ vm }: { vm: DashboardVM }) {
       <header className="flex items-center justify-between pb-5 pt-6">
         <Logo />
         <div className="flex items-center gap-2">
-          {vm.trialDaysLeft !== null && (
+          {vm.isTestAccount ? (
             <Link
-              href="/assinatura"
-              className="pressable rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-[10.5px] font-bold text-amber-300"
+              href="/configuracoes"
+              title="Conta de teste: Pro liberado sem cobrança e fora das estatísticas do painel"
+              className="pressable rounded-full border border-sky-400/30 bg-sky-400/10 px-3 py-2 text-[10.5px] font-bold text-sky-300"
             >
-              Teste: {vm.trialDaysLeft} {vm.trialDaysLeft === 1 ? "dia" : "dias"}
+              Conta de teste
             </Link>
+          ) : (
+            vm.trialDaysLeft !== null && (
+              <Link
+                href="/assinatura"
+                className="pressable rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-[10.5px] font-bold text-amber-300"
+              >
+                Teste: {vm.trialDaysLeft} {vm.trialDaysLeft === 1 ? "dia" : "dias"}
+              </Link>
+            )
           )}
           <button
             type="button"

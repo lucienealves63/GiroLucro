@@ -19,6 +19,7 @@ import {
 } from "@/db/schema";
 import { acceptanceSummary } from "@/lib/legal-acceptance";
 import { BUSINESS_INFO } from "@/lib/business-info";
+import { isTestAccount } from "@/lib/test-accounts";
 import { CURRENT_VERSIONS, PRIVACY_VERSION, TERMS_VERSION } from "@/lib/legal";
 import { DELETE_CONFIRMATION_WORD } from "@/lib/privacy-constants";
 
@@ -92,6 +93,9 @@ export async function buildAccountExport(user: User) {
       nome: user.name,
       email: user.email,
       criadaEm: user.createdAt?.toISOString() ?? null,
+      // Conta de teste (dono/QA): acesso liberado sem cobrança e fora das
+      // estatísticas do painel — o titular vê isso no próprio export.
+      contaDeTeste: isTestAccount(user),
       plano: {
         status: user.planStatus,
         ciclo: user.planCycle,

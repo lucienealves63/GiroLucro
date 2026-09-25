@@ -73,9 +73,20 @@ export type SubscriberReport = {
     channel: string;
     referrer: string;
     entryPath: string;
+    /** Conta de teste: fora dos números, marcada na lista com etiqueta própria. */
+    isTest: boolean;
   }[];
   attribution: NamedCount[];
   topLandingPages: NamedCount[];
+  /** Contas de teste cadastradas (fora de todos os números acima). */
+  testAccounts: {
+    id: number;
+    name: string;
+    email: string;
+    createdDay: string;
+    planLabel: string;
+  }[];
+  testTotal: number;
 };
 
 export type ContactRow = {
@@ -161,6 +172,13 @@ async function tableExists(name: string): Promise<boolean> {
 
 /** paid = acesso pago ativo (pagamento único tem current_period_end ~2100). */
 const PAID_SQL = `(u.plan_status IN ('active','canceled') AND u.current_period_end > now())`;
+
+/**
+ * Contas de teste (`users.is_test`) ficam fora de TODA estatística de negócio:
+ * cadastros, conversão, pagantes, receita e funil. Elas têm uma lista própria
+ * no painel (aba Pagantes) e são identificadas nas listas de contas.
+ */
+const REAL_USERS_SQL = `u.is_test = false`;
 
 export async function buildReport(days: number): Promise<Report> {
   const daysSafe = Math.max(3, Math.min(180, Math.round(days)));
@@ -326,11 +344,14 @@ export async function buildReport(days: number): Promise<Report> {
                 count(*) FILTER (WHERE ${PAID_SQL})::int AS paid
            FROM users u
           WHERE created_at >= (current_date - ($1::int * 2 + 3) * interval '1 day')
+            AND ${REAL_USERS_SQL}
           GROUP BY 1`,
         [daysSafe],
       ),
       query(
-        `SELECT count(*)::int AS n FROM users WHERE created_at::date >= (CURRENT_DATE - $1::int) AND created_at::date < (CURRENT_DATE - $1::int)`,
+        `SELECT count(*)::int AS n FROM users u
+          WHERE u.created_at::date >= (CURRENT_DATE - $1::int) AND u.created_at::date < (CURRENT_DATE - $1::int)
+            AND ${REAL_USERS_SQL}`,
         [daysSafe],
       ).catch(() => [{ n: 0 }]),
     ]);
@@ -442,7 +463,8 @@ export async function buildReport(days: number): Promise<Report> {
               count(*) FILTER (WHERE ${PAID_SQL})::int AS paying,
               count(*) FILTER (WHERE plan_status = 'canceled' AND NOT (${PAID_SQL}))::int AS canceled,
               count(*) FILTER (WHERE plan_status = 'pending_payment')::int AS pending
-         FROM users u`,
+         FROM users u
+        WHERE ${REAL_USERS_SQL}`,
       [daysSafe],
     )
   )[0] ?? {};
@@ -452,14 +474,25 @@ export async function buildReport(days: number): Promise<Report> {
         (
           await query(
             `SELECT count(DISTINCT user_id)::int AS n FROM page_views
-              WHERE user_id IS NOT NULL AND day >= to_char(now() - interval '7 days', 'YYYY-MM-DD')`,
+              WHERE user_id IS NOT NULL AND day >= to_char(now() - interval '7 days', 'YYYY-MM-DD')
+                AND user_id NOT IN (SELECT id FROM users WHERE is_test = true)`,
           )
         )[0] ?? {},
       )
     : 0;
 
   const byStatusRows = await query(
-    `SELECT plan_status AS k, count(*)::int AS n FROM users u GROUP BY 1 ORDER BY 2 DESC`,
+    `SELECT plan_status AS k, count(*)::int AS n FROM users u
+      WHERE ${REAL_USERS_SQL} GROUP BY 1 ORDER BY 2 DESC`,
+  ).catch(() => [] as Record<string, unknown>[]);
+
+  // Contas de teste: lista própria, fora de todos os números.
+  const testRows = await query(
+    `SELECT u.id, u.name, u.email, u.plan_status,
+            to_char(u.created_at AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM-DD') AS day
+       FROM users u
+      WHERE u.is_test = true
+      ORDER BY u.created_at DESC LIMIT 50`,
   ).catch(() => [] as Record<string, unknown>[]);
 
   const statusLabel = (s: string): string => {
@@ -476,7 +509,7 @@ export async function buildReport(days: number): Promise<Report> {
         SELECT DISTINCT ON (user_id) user_id, channel, referrer_domain, path
           FROM page_views WHERE user_id IS NOT NULL AND is_bot = false
          ORDER BY user_id, created_at, id)
-     SELECT u.id, u.name, u.email, u.plan_status, u.plan_cycle,
+     SELECT u.id, u.name, u.email, u.plan_status, u.plan_cycle, u.is_test,
             to_char(u.created_at AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM-DD') AS day,
             u.trial_ends_at, u.current_period_end,
             coalesce(ft.channel, '—') AS channel, coalesce(ft.referrer_domain, '—') AS referrer,
@@ -494,6 +527,7 @@ export async function buildReport(days: number): Promise<Report> {
          SELECT ft.channel AS k, count(*)::int AS signups,
                 count(*) FILTER (WHERE ${PAID_SQL})::int AS paid
            FROM ft JOIN users u ON u.id = ft.user_id
+          WHERE ${REAL_USERS_SQL}
           GROUP BY 1 ORDER BY 2 DESC`,
       ).catch(() => [] as Record<string, unknown>[])
     : [];
@@ -507,6 +541,7 @@ export async function buildReport(days: number): Promise<Report> {
          SELECT ft.path AS k, count(*)::int AS signups,
                 count(*) FILTER (WHERE ${PAID_SQL})::int AS paid
            FROM ft JOIN users u ON u.id = ft.user_id
+          WHERE ${REAL_USERS_SQL}
           GROUP BY 1 ORDER BY 2 DESC LIMIT 8`,
       ).catch(() => [] as Record<string, unknown>[])
     : [];
@@ -539,6 +574,7 @@ export async function buildReport(days: number): Promise<Report> {
     }),
     recent: recentRows.map((r) => {
       const status = String(r.plan_status);
+      const isTest = Boolean(r.is_test);
       const isPaid = status === "active" || (status === "canceled" && r.current_period_end && new Date(String(r.current_period_end)) > new Date());
       const isTrial =
         status === "trialing" && r.trial_ends_at && new Date(String(r.trial_ends_at)) > new Date();
@@ -547,17 +583,28 @@ export async function buildReport(days: number): Promise<Report> {
         name: String(r.name ?? ""),
         email: String(r.email ?? ""),
         createdDay: String(r.day ?? ""),
-        statusLabel: isPaid
-          ? `Pro ${r.plan_cycle === "lifetime" ? "pagamento único" : "ativo"}`
-          : isTrial
-            ? "Em teste"
-            : statusLabel(status),
-        statusClass: isPaid ? "pago" : isTrial ? "trial" : "morto",
+        statusLabel: isTest
+          ? "Conta de teste"
+          : isPaid
+            ? `Pro ${r.plan_cycle === "lifetime" ? "pagamento único" : "ativo"}`
+            : isTrial
+              ? "Em teste"
+              : statusLabel(status),
+        statusClass: isTest ? "teste" : isPaid ? "pago" : isTrial ? "trial" : "morto",
         channel: String(r.channel ?? "—"),
         referrer: String(r.referrer ?? "—"),
         entryPath: r.entry_path ? pageLabel(String(r.entry_path)) : "—",
+        isTest,
       };
     }),
+    testAccounts: testRows.map((r) => ({
+      id: int(r.id),
+      name: String(r.name ?? ""),
+      email: String(r.email ?? ""),
+      createdDay: String(r.day ?? ""),
+      planLabel: statusLabel(String(r.plan_status)),
+    })),
+    testTotal: testRows.length,
     attribution: attributionRows.map((r) => ({
       label: String(r.k),
       value: int(r.signups),
@@ -614,6 +661,7 @@ export async function buildReport(days: number): Promise<Report> {
               paid_at, refund_status, refund_requested_at
          FROM users
         WHERE refund_status IS NOT NULL AND refund_status <> 'none'
+          AND is_test = false
         ORDER BY (refund_status IN ('manual','requested','processing')) DESC,
                  coalesce(refund_requested_at, paid_at) DESC NULLS LAST
         LIMIT 60`,

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { and, eq, gt } from "drizzle-orm";
 import { db } from "@/db";
 import { sessions, users, type User } from "@/db/schema";
+import { isTestAccount } from "@/lib/test-accounts";
 
 const scryptAsync = promisify(scrypt);
 
@@ -70,7 +71,16 @@ export async function requireUser(opts: { needsAccess?: boolean } = {}): Promise
 
 /* -------------------------------- assinatura ------------------------------- */
 
-export function hasAccess(user: Pick<User, "planStatus" | "trialEndsAt" | "currentPeriodEnd">): boolean {
+/**
+ * Acesso aos recursos Pro.
+ *
+ * Contas de teste (`users.is_test`) têm acesso **sempre** — sem trial, sem
+ * pagamento e sem prazo (ver `src/lib/test-accounts.ts`).
+ */
+export function hasAccess(
+  user: Pick<User, "planStatus" | "trialEndsAt" | "currentPeriodEnd" | "isTest">,
+): boolean {
+  if (isTestAccount(user)) return true;
   const now = new Date();
   if (
     (user.planStatus === "active" || user.planStatus === "canceled") &&
@@ -89,7 +99,14 @@ export function hasAccess(user: Pick<User, "planStatus" | "trialEndsAt" | "curre
   return false;
 }
 
-export function trialDaysLeft(user: User): number | null {
+/**
+ * Dias restantes do teste grátis — `null` quando não há teste correndo.
+ * Contas de teste nunca mostram contagem: o acesso não expira.
+ */
+export function trialDaysLeft(
+  user: Pick<User, "planStatus" | "trialEndsAt" | "isTest">,
+): number | null {
+  if (isTestAccount(user)) return null;
   if (user.planStatus !== "trialing" || !user.trialEndsAt) return null;
   const ms = user.trialEndsAt.getTime() - Date.now();
   return Math.max(0, Math.ceil(ms / 86400000));

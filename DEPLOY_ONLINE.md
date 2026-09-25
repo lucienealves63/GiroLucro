@@ -80,6 +80,15 @@ Você verá uma tela bonita listando cada tabela criada, incluindo
 2. Toque em **"Explorar com dados de exemplo"** para ver tudo funcionando
 3. Compre seu domínio no Registro.br e conecte em **Settings → Domains** na Vercel
 
+> 🧪 **Sua conta é conta de teste.** A conta administrativa
+> (`lucienealves63@gmail.com`) é marcada como **conta de teste** automaticamente
+> no primeiro acesso depois do deploy: o Pro fica liberado **sem cobrança**, o app
+> nunca abre checkout/Pix para ela e os números do painel (cadastros, conversão,
+> pagantes e receita) não são distorcidos pelos seus testes.
+> Para marcar outra conta (QA, celular de teste) ou desmarcar: **`/admin` → aba
+> Pagantes → card "Contas de teste"**. Detalhes em
+> [PAINEL_ACESSOS.md](./PAINEL_ACESSOS.md#8-contas-de-teste-acesso-liberado-fora-dos-números).
+
 ## Atualizações futuras (sem terminal de novo)
 
 Quando quiser mudar o app:

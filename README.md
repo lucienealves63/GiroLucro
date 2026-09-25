@@ -28,6 +28,10 @@
 - **Painel do dono** (`/admin`) — acessos, desempenho das visitas, assinantes/conversão
   e a caixa de entrada do `/contato`. Medição própria, sem Google Analytics, sem
   cookie de terceiros → [PAINEL_ACESSOS.md](./PAINEL_ACESSOS.md)
+- **Contas de teste** — a conta administrativa (e qualquer conta marcada no painel)
+  tem o **Pro liberado sem cobrança** e fica **fora das estatísticas** de cadastros,
+  conversão, pagantes e receita; nenhum checkout/Pix é aberto e os avisos de
+  cobrança não são enviados → [PAINEL_ACESSOS.md](./PAINEL_ACESSOS.md#8-contas-de-teste-acesso-liberado-fora-dos-números)
 
 ## Stack
 

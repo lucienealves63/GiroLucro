@@ -43,6 +43,13 @@
       "when": 1790364080978,
       "tag": "0005_fuel_by_station",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790374963275,
+      "tag": "0006_test_account",
+      "breakpoints": true
     }
   ]
 }

@@ -1,3 +1,4 @@
+import { OWNER_TEST_EMAIL } from "@/lib/test-accounts";
 import { pool } from "./index";
 
 /**
@@ -14,7 +15,7 @@ import { pool } from "./index";
  * então rodar em paralelo ou repetir nunca quebra nada.
  */
 
-export type SetupKind = "table" | "index" | "column";
+export type SetupKind = "table" | "index" | "column" | "data";
 
 type SetupStatement = {
   name: string;
@@ -24,7 +25,15 @@ type SetupStatement = {
   /** Para kind=column: nome da coluna. */
   column?: string;
   sql: string;
+  /**
+   * Para kind=data: consulta que devolve `ok = true` quando a mudança de dados
+   * já está no banco (evita contar como nova a cada execução).
+   */
+  check?: string;
 };
+
+/** E-mail do dono como literal SQL (aspas simples duplicadas). */
+const OWNER_TEST_EMAIL_SQL = `'${OWNER_TEST_EMAIL.replace(/'/g, "''")}'`;
 
 export const STATEMENTS: SetupStatement[] = [
   {
@@ -203,6 +212,7 @@ export const STATEMENTS: SetupStatement[] = [
       "password_hash" text NOT NULL,
       "plan_status" text DEFAULT 'trialing' NOT NULL,
       "plan_cycle" text,
+      "is_test" boolean DEFAULT false NOT NULL,
       "trial_ends_at" timestamp with time zone,
       "current_period_end" timestamp with time zone,
       "billing_customer_id" text,
@@ -384,6 +394,8 @@ export const STATEMENTS: SetupStatement[] = [
       ["refunded_at", `timestamp with time zone`],
       ["refund_status", `text DEFAULT 'none'`],
       ["deleted_at", `timestamp with time zone`],
+      // conta de teste: acesso liberado sem cobrança e fora das métricas
+      ["is_test", `boolean DEFAULT false NOT NULL`],
     ] as const
   ).map(([column, type]) => ({
     name: `users.${column}`,
@@ -392,6 +404,21 @@ export const STATEMENTS: SetupStatement[] = [
     column,
     sql: `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "${column}" ${type}`,
   })),
+  /**
+   * Dados (roda uma vez, junto com a criação da coluna): a conta administrativa
+   * do dono já nasce como conta de teste — acesso Pro liberado e fora das
+   * estatísticas do painel. Depois disso, marcar/desmarcar é pelo /admin.
+   */
+  {
+    name: "users.is_test_owner",
+    kind: "data",
+    sql: `UPDATE "users" SET "is_test" = true
+           WHERE lower("email") = ${OWNER_TEST_EMAIL_SQL} AND "is_test" = false`,
+    check: `SELECT NOT EXISTS (
+              SELECT 1 FROM "users"
+               WHERE lower("email") = ${OWNER_TEST_EMAIL_SQL} AND "is_test" = false
+            ) AS ok`,
+  },
 ];
 
 
@@ -405,6 +432,17 @@ export async function alreadyExists(st: SetupStatement): Promise<boolean> {
       st.name,
     ]);
     return (r.rowCount ?? 0) > 0;
+  }
+  if (st.kind === "data") {
+    if (!st.check) return false;
+    try {
+      const r = await pool.query(st.check);
+      return Boolean(r.rows[0]?.ok);
+    } catch {
+      // Coluna/tabela ainda não existe (a declaração que a cria vem antes):
+      // trata como "falta aplicar" para o UPDATE rodar na sequência.
+      return false;
+    }
   }
   // column
   const r = await pool.query(

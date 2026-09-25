@@ -56,7 +56,7 @@ começam e abandonam.
 **Pagantes** — contas criadas, em teste, pagantes, recebido, funil
 *visita → conta → teste → pago*, situação do acesso (ativo, encerrado, aguardando
 pagamento), cadastros por dia, qual canal/página traz pagante e a lista dos últimos
-cadastros com a origem de cada um.
+cadastros com a origem de cada um — mais o card **Contas de teste** (seção 8).
 
 **Pedidos** — a fila de **reembolsos** e as **solicitações de titular (LGPD)**.
 Quando o reembolso não pôde ser automático (pedido fora do prazo de 7 dias,
@@ -136,7 +136,40 @@ https://SEU-DOMINIO/api/admin/export?table=users&token=SEU_TOKEN             →
 https://SEU-DOMINIO/api/admin/export?table=messages&token=SEU_TOKEN           → CSV do contato
 ```
 
-Os CSVs usam `;` e BOM, padrão que o Excel em português abre direto.
+Os CSVs usam `;` e BOM, padrão que o Excel em português abre direto. O CSV de
+assinantes traz a coluna `conta_de_teste` (0/1) para você separar depois na
+planilha, caso precise.
+
+## 8. Contas de teste (acesso liberado, fora dos números)
+
+Sua conta administrativa (`lucienealves63@gmail.com`), contas de QA e qualquer
+conta que você use para **testar o app** não podem contar como cliente nem
+distorcer a conversão. Para isso existe a marca de **conta de teste**
+(`users.is_test`), controlada em **`/admin?aba=assinantes`** → card
+**Contas de teste**, sem deploy:
+
+- **Marcar** — digite o e-mail da conta e clique em *Marcar como conta de teste*.
+  Na lista *Últimos cadastros*, cada conta também tem o botão *tornar teste*.
+- **Desmarcar** — botão *remover teste* na lista de contas de teste (ou na
+  própria lista de cadastros). A conta volta às regras normais.
+
+O que a marca faz:
+
+| Efeito | Detalhe |
+| --- | --- |
+| **Acesso Pro sem cobrança** | `hasAccess` libera tudo, sem trial e sem prazo. Nenhum checkout/Pix é aberto: as rotas `/api/billing/checkout` e `/checkout-pix` respondem `409` para essas contas. No app, o selo **Conta de teste** aparece na tela inicial, em *Configurações* e em *Assinatura*. |
+| **Fora das estatísticas** | Cadastros, em teste, pagantes, receita, conversão, funil, situação do acesso, gráficos de cadastro e os rankings de canal/página ignoram a conta. A aba mostra a etiqueta `conta de teste` e o aviso “Fora de todos estes números”. |
+| **Sem avisos de cobrança** | As rotinas de e-mail/push (teste vencendo, meta do dia, manutenção e lembrete de prazo de reembolso) pulam contas de teste. |
+
+O que a marca **não** muda: as visitas gravadas nas páginas (`page_views`)
+continuam contando como acesso — a medição é anônima e não vinculada ao cadastro.
+Para não se contar enquanto mexe no app, use
+`localStorage.setItem('gl_analytics_off','1')` (seção 4).
+
+A conta administrativa é marcada **automaticamente** na primeira vez que esta
+versão roda (`users.is_test_owner`, no boot — ver `src/db/schema-ensure.ts`), se
+a conta já existir. Se você criar a conta depois, use o card. Para apontar a
+marcação automática para outro e-mail, defina `OWNER_TEST_EMAIL` na Vercel.
 
 ## Segurança
 

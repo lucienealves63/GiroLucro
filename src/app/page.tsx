@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { Dashboard } from "@/components/dashboard";
 import { LandingClient } from "@/components/landing-client";
 import { getSessionUser, hasAccess, trialDaysLeft } from "@/lib/auth";
+import { isTestAccount } from "@/lib/test-accounts";
 import {
   buildInsights,
   computeDay,
@@ -98,6 +99,7 @@ export default async function Home() {
     today,
     firstName: user.name.split(" ")[0],
     trialDaysLeft: trialDaysLeft(user),
+    isTestAccount: isTestAccount(user),
     dateLabel: new Intl.DateTimeFormat("pt-BR", {
       weekday: "long",
       day: "numeric",
