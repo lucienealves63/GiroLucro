@@ -1,5 +1,3 @@
-import { ensureSchema } from "@/db/schema-ensure";
-
 /**
  * Executado no boot de cada instância do servidor (inclusive cada cold
  * start na Vercel), ANTES de a instância atender a primeira requisição.
@@ -15,7 +13,17 @@ import { ensureSchema } from "@/db/schema-ensure";
 export async function register() {
   if (process.env.NEXT_RUNTIME === "edge") return;
 
+  if (!process.env.DATABASE_URL) {
+    console.warn(
+      "[schema-ensure] DATABASE_URL não definida — sincronização do schema ignorada.",
+    );
+    return;
+  }
+
   try {
+    // Import dinâmico: erros ao carregar o módulo do banco ficam dentro do
+    // try/catch e não derrubam o servidor inteiro.
+    const { ensureSchema } = await import("@/db/schema-ensure");
     const r = await ensureSchema();
     if (r.failed > 0) {
       console.warn(
