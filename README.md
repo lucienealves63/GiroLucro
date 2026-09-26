@@ -1,4 +1,4 @@
-# GiroLucro
+# GiroLucroApp
 
 > Seu lucro real na pista. SaaS para motoristas de aplicativo e motoboys
 > descobrirem **quanto sobra de verdade** no bolso — não o bruto do app.
