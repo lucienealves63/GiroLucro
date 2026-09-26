@@ -503,6 +503,17 @@ function ensureState() {
 }
 
 /**
+ * Esquece que o schema já foi conferido nesta instância — usado quando uma
+ * consulta falha por coluna/tabela inexistente, para forçar nova conferência.
+ */
+export function resetSchemaEnsure(): void {
+  const s = ensureState();
+  if (s.running) return;
+  s.done = false;
+  s.lastFailAt = 0;
+}
+
+/**
  * Verificação barata (3 consultas) de que TODAS as declarações do schema
  * já existem. Sem marcador de versão: nada fica "desincronizado" se alguém
  * aplicar um passo manualmente.

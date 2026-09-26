@@ -1,3 +1,4 @@
+import { isMissingSchemaError } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -17,7 +18,17 @@ export async function POST(req: Request) {
     const email = String(body.email ?? "").trim().toLowerCase();
     const password = String(body.password ?? "");
 
-    const rows = await db.select().from(users).where(eq(users.email, email));
+    const findUser = () => db.select().from(users).where(eq(users.email, email));
+    let rows: Awaited<ReturnType<typeof findUser>>;
+    try {
+      rows = await findUser();
+    } catch (e) {
+      if (!isMissingSchemaError(e)) throw e;
+      const { ensureSchema, resetSchemaEnsure } = await import("@/db/schema-ensure");
+      resetSchemaEnsure();
+      await ensureSchema();
+      rows = await findUser();
+    }
     const user = rows[0];
     if (!user || !(await verifyPassword(password, user.passwordHash))) {
       return NextResponse.json(

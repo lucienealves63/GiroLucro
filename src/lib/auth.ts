@@ -51,14 +51,40 @@ export async function getSessionUser(): Promise<User | null> {
   const token = store.get(SESSION_COOKIE)?.value;
   if (!token) return null;
   const now = new Date();
-  const rows = await db
-    .select({ user: users, session: sessions })
-    .from(sessions)
-    .innerJoin(users, eq(sessions.userId, users.id))
-    .where(and(eq(sessions.token, token), gt(sessions.expiresAt, now)));
+  const query = () =>
+    db
+      .select({ user: users, session: sessions })
+      .from(sessions)
+      .innerJoin(users, eq(sessions.userId, users.id))
+      .where(and(eq(sessions.token, token), gt(sessions.expiresAt, now)));
+  let rows: Awaited<ReturnType<typeof query>>;
+  try {
+    rows = await query();
+  } catch (e) {
+    // Banco atrás do código (coluna/tabela nova ainda não criada): aplica o
+    // schema na hora e tenta de novo, em vez de derrubar a página de quem
+    // está logado.
+    if (!isMissingSchemaError(e)) throw e;
+    console.warn("[auth] schema desatualizado — aplicando e tentando de novo");
+    const { ensureSchema, resetSchemaEnsure } = await import("@/db/schema-ensure");
+    resetSchemaEnsure();
+    await ensureSchema();
+    rows = await query();
+  }
   const row = rows[0];
   if (!row) return null;
   return row.user;
+}
+
+/** 42703 = coluna inexistente · 42P01 = tabela inexistente (Postgres). */
+export function isMissingSchemaError(e: unknown): boolean {
+  let cur: unknown = e;
+  for (let i = 0; i < 4 && cur && typeof cur === "object"; i++) {
+    const code = (cur as { code?: unknown }).code;
+    if (code === "42703" || code === "42P01") return true;
+    cur = (cur as { cause?: unknown }).cause;
+  }
+  return false;
 }
 
 /** Guarda para páginas: exige login (e opcionalmente acesso ativo). */
