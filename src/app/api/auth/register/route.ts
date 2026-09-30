@@ -11,6 +11,7 @@ import {
 } from "@/lib/auth";
 import { PRIVACY_VERSION, TERMS_VERSION } from "@/lib/legal";
 import { recordLegalAcceptance } from "@/lib/legal-acceptance";
+import { isOwnerEmail } from "@/lib/test-accounts";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +67,8 @@ export async function POST(req: Request) {
         passwordHash: await hashPassword(password),
         planStatus: "trialing",
         trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 86400000),
+        // A conta do dono já nasce liberada; não precisa esperar novo deploy/setup.
+        isTest: isOwnerEmail(email),
         // guardamos versão + data/hora do aceite (não o texto dos documentos)
         termsAcceptedAt: acceptedAt,
         termsVersion: TERMS_VERSION,

@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { users } from "@/db/schema";
+import { sessions, users } from "@/db/schema";
 import { STATEMENTS } from "@/db/schema-ensure";
 import { createTestDbWithSchema, type TestDb } from "./helpers/pgmem";
 
@@ -27,7 +27,7 @@ jest.mock("next/headers", () => ({ cookies: () => ({ get: () => undefined }) }))
 jest.mock("next/navigation", () => ({ redirect: () => undefined }));
 
 const { hasAccess, trialDaysLeft } = require("@/lib/auth") as typeof import("@/lib/auth");
-const { isTestAccount, listTestAccounts, setTestAccountByEmail, setTestAccountById } =
+const { isOwnerEmail, isTestAccount, listTestAccounts, setTestAccountByEmail, setTestAccountById } =
   require("@/lib/test-accounts") as typeof import("@/lib/test-accounts");
 
 type SeedOptions = {
@@ -63,6 +63,13 @@ const daysAhead = (n: number) => new Date(Date.now() + n * 86_400_000);
 beforeEach(async () => {
   db = await createTestDbWithSchema();
   poolQuery = jest.fn(async () => ({ rows: [] }));
+});
+
+describe("conta do dono", () => {
+  it("reconhece o e-mail administrativo corrigido", () => {
+    expect(isOwnerEmail(" LucieEAlves63@GMAIL.COM ")).toBe(true);
+    expect(isOwnerEmail("lucienealves63@gmail.com")).toBe(false);
+  });
 });
 
 describe("marcação de conta de teste", () => {
@@ -169,7 +176,7 @@ describe("schema e marcação automática da conta administrativa", () => {
     const st = ownerStatement();
     expect(st?.kind).toBe("data");
     // conta que já existe antes da migração entra como conta de teste
-    await seedUser({ id: 10, email: "lucienealves63@gmail.com" });
+    await seedUser({ id: 10, email: "lucieealves63@gmail.com" });
     await seedUser({ id: 11, email: "cliente@exemplo.com" });
 
     await db.raw(st!.sql);
@@ -218,7 +225,7 @@ describe("painel: card de contas de teste", () => {
         {
           id: 1,
           name: "Luciene Alves",
-          email: "lucienealves63@gmail.com",
+          email: "lucieealves63@gmail.com",
           createdDay: "2026-09-20",
           statusLabel: "Conta de teste",
           statusClass: "teste",
@@ -246,7 +253,7 @@ describe("painel: card de contas de teste", () => {
         {
           id: 1,
           name: "Luciene Alves",
-          email: "lucienealves63@gmail.com",
+          email: "lucieealves63@gmail.com",
           createdDay: "2026-09-20",
           planLabel: "Em teste",
         },
@@ -268,12 +275,49 @@ describe("painel: card de contas de teste", () => {
     // links do formulário preservam a aba e o token
     expect(html).toContain("/admin?aba=assinantes&amp;token=segredo");
     // a conta de teste aparece listada, com botão de remover
-    expect(html).toContain("lucienealves63@gmail.com");
+    expect(html).toContain("lucieealves63@gmail.com");
     expect(html).toContain('name="action" value="test_remove"');
     expect(html).toContain("remover teste");
     // e a lista de cadastros permite marcar uma conta comum
     expect(html).toContain("tornar teste");
     expect(html).toContain('value="csrf-123"');
+  });
+});
+
+describe("painel: acesso pela conta do dono", () => {
+  const TOKEN = "token-do-painel";
+  const { checkAdminAccess, verifyAdminFormCsrf } =
+    require("@/lib/admin-auth") as typeof import("@/lib/admin-auth");
+
+  beforeEach(() => {
+    process.env.ADMIN_SETUP_TOKEN = TOKEN;
+  });
+
+  async function accessFor(userId: number, email: string) {
+    await seedUser({ id: userId, email });
+    const sessionToken = `sessao-${userId}`;
+    await db.insert(sessions).values({
+      token: sessionToken,
+      userId,
+      expiresAt: daysAhead(1),
+    });
+    return checkAdminAccess(
+      new Request("http://localhost/admin", {
+        headers: { cookie: `gl_session=${sessionToken}` },
+      }),
+    );
+  }
+
+  it("autoriza a sessão válida do e-mail administrativo e gera CSRF", async () => {
+    const access = await accessFor(20, "lucieealves63@gmail.com");
+    expect(access.authorized).toBe(true);
+    expect(access.csrf).toHaveLength(32);
+    expect(verifyAdminFormCsrf(access.csrf, access)).toBe(true);
+  });
+
+  it("não autoriza uma conta comum somente por estar logada", async () => {
+    const access = await accessFor(21, "cliente@exemplo.com");
+    expect(access.authorized).toBe(false);
   });
 });
 

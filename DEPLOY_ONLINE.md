@@ -81,7 +81,7 @@ Você verá uma tela bonita listando cada tabela criada, incluindo
 3. Compre seu domínio no Registro.br e conecte em **Settings → Domains** na Vercel
 
 > 🧪 **Sua conta é conta de teste.** A conta administrativa
-> (`lucienealves63@gmail.com`) é marcada como **conta de teste** automaticamente
+> (`lucieealves63@gmail.com`) é marcada como **conta de teste** automaticamente
 > no primeiro acesso depois do deploy: o Pro fica liberado **sem cobrança**, o app
 > nunca abre checkout/Pix para ela e os números do painel (cadastros, conversão,
 > pagantes e receita) não são distorcidos pelos seus testes.

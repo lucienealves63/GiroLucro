@@ -288,7 +288,7 @@ export function loginPage(error?: string): string {
     title: "Acesso restrito",
     children: `<div class="login">
       <h1>Painel do <span style="color:#b8f53c">GiroLucro</span></h1>
-      <p>Acompanhe acessos, visitas, cadastros e assinantes. Precisa do token de administrador (a variável <code>ADMIN_SETUP_TOKEN</code> da Vercel).</p>
+      <p>Acompanhe acessos, visitas, cadastros e assinantes. Entre antes no app com a conta do dono e volte a esta página, ou use o token de administrador (<code>ADMIN_SETUP_TOKEN</code> da Vercel).</p>
       ${error ? `<div class="note err" style="margin:0 0 14px"><b>Token incorreto.</b><div style="margin-top:4px">Confira a variável <code>ADMIN_SETUP_TOKEN</code> definida no deploy.</div></div>` : ""}
       <form method="POST" action="/admin">
         <input type="password" name="token" placeholder="Token de administrador" autofocus autocomplete="current-password" />

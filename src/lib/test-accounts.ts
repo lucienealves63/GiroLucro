@@ -20,10 +20,15 @@ import { users } from "@/db/schema";
  * Pode ser trocado pela variável de ambiente OWNER_TEST_EMAIL.
  */
 export const OWNER_TEST_EMAIL = (
-  process.env.OWNER_TEST_EMAIL ?? "lucienealves63@gmail.com"
+  process.env.OWNER_TEST_EMAIL ?? "lucieealves63@gmail.com"
 )
   .trim()
   .toLowerCase();
+
+/** Identifica a conta do dono sem depender de maiúsculas ou espaços. */
+export function isOwnerEmail(email: string | null | undefined): boolean {
+  return String(email ?? "").trim().toLowerCase() === OWNER_TEST_EMAIL;
+}
 
 /** Alguma coisa com (ou sem) a marca de conta de teste. */
 export function isTestAccount(
