@@ -203,6 +203,7 @@ describe("painel: card de contas de teste", () => {
   const reportStub = {
     ok: true,
     problems: [],
+    failures: [],
     range: { days: 30, from: "2026-08-27", to: "2026-09-25", label: "2026-09-25" },
     visits: null,
     subscribers: {

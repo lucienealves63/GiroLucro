@@ -140,6 +140,8 @@ export type RequestReport = {
 export type Report = {
   ok: boolean;
   problems: string[]; // avisos de setup (tabela faltando etc.)
+  /** Erros de consulta tolerados (coluna faltando, banco fora do ar…). */
+  failures: string[];
   range: { days: number; from: string; to: string; label: string };
   visits: VisitReport | null;
   subscribers: SubscriberReport;
@@ -181,6 +183,20 @@ const PAID_SQL = `(u.plan_status IN ('active','canceled') AND u.current_period_e
 const REAL_USERS_SQL = `u.is_test = false`;
 
 export async function buildReport(days: number): Promise<Report> {
+  /**
+   * Nenhuma consulta do painel pode derrubar a página. Se uma tabela/coluna
+   * ainda não foi migrada (ou o banco oscila), a consulta vira lista vazia e
+   * o motivo aparece na aba Diagnóstico — o painel continua abrindo.
+   */
+  const failures: string[] = [];
+  const q = (text: string, params: unknown[] = []): Promise<Record<string, unknown>[]> =>
+    query(text, params).catch((e: unknown) => {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!failures.includes(msg)) failures.push(msg);
+      console.error("[admin] consulta falhou:", msg);
+      return [] as Record<string, unknown>[];
+    });
+
   const daysSafe = Math.max(3, Math.min(180, Math.round(days)));
   const range = dayRange(daysSafe);
   const from = range[0];
@@ -196,7 +212,7 @@ export async function buildReport(days: number): Promise<Report> {
   const [views, bots, visits, sessionsAgg, topPages, channels, referrers, campaigns, devices, browsers, countries, entry, exit, hours, weekdays, signupSeries, prevSignup] =
     await Promise.all([
       hasViews
-        ? query(
+        ? q(
             `SELECT count(*)::int AS views,
                     count(DISTINCT visitor_id)::int AS visitors,
                     count(DISTINCT session_id)::int AS sessions,
@@ -208,13 +224,13 @@ export async function buildReport(days: number): Promise<Report> {
           )
         : Promise.resolve([] as Record<string, unknown>[]),
       hasViews
-        ? query(`SELECT count(*)::int AS n FROM page_views WHERE day >= $1 AND day <= $2 AND is_bot`, [
+        ? q(`SELECT count(*)::int AS n FROM page_views WHERE day >= $1 AND day <= $2 AND is_bot`, [
             from,
             to,
           ])
         : Promise.resolve([] as Record<string, unknown>[]),
       hasViews
-        ? query(
+        ? q(
             `SELECT day,
                     count(*)::int AS views,
                     count(DISTINCT visitor_id)::int AS visitors,
@@ -225,7 +241,7 @@ export async function buildReport(days: number): Promise<Report> {
           )
         : Promise.resolve([] as Record<string, unknown>[]),
       hasViews
-        ? query(
+        ? q(
             `WITH s AS (
                 SELECT session_id, count(*)::int AS pages, coalesce(sum(dwell_ms), 0)::int AS dwell
                   FROM page_views WHERE day >= $1 AND day <= $2 AND is_bot = false
@@ -239,7 +255,7 @@ export async function buildReport(days: number): Promise<Report> {
           )
         : Promise.resolve([] as Record<string, unknown>[]),
       hasViews
-        ? query(
+        ? q(
             `SELECT path, count(*)::int AS views, count(DISTINCT visitor_id)::int AS visitors,
                     coalesce(avg(dwell_ms), 0)::float8 AS avg_dwell
                FROM page_views WHERE day >= $1 AND day <= $2 AND is_bot = false
@@ -248,7 +264,7 @@ export async function buildReport(days: number): Promise<Report> {
           )
         : Promise.resolve([] as Record<string, unknown>[]),
       hasViews
-        ? query(
+        ? q(
             `SELECT coalesce(channel, 'direto') AS k, count(*)::int AS views,
                     count(DISTINCT visitor_id)::int AS visitors
                FROM page_views WHERE day >= $1 AND day <= $2 AND is_bot = false
@@ -257,7 +273,7 @@ export async function buildReport(days: number): Promise<Report> {
           )
         : Promise.resolve([] as Record<string, unknown>[]),
       hasViews
-        ? query(
+        ? q(
             `SELECT coalesce(referrer_domain, 'acesso direto') AS k, count(*)::int AS views,
                     count(DISTINCT visitor_id)::int AS visitors
                FROM page_views WHERE day >= $1 AND day <= $2 AND is_bot = false AND channel <> 'interno'
@@ -266,7 +282,7 @@ export async function buildReport(days: number): Promise<Report> {
           )
         : Promise.resolve([] as Record<string, unknown>[]),
       hasViews
-        ? query(
+        ? q(
             `SELECT coalesce(source, '—') AS k, coalesce(campaign, 'sem campanha') AS c,
                     count(*)::int AS views, count(DISTINCT visitor_id)::int AS visitors,
                     count(*) FILTER (WHERE user_id IS NOT NULL)::int AS converted
@@ -277,7 +293,7 @@ export async function buildReport(days: number): Promise<Report> {
           )
         : Promise.resolve([] as Record<string, unknown>[]),
       hasViews
-        ? query(
+        ? q(
             `SELECT coalesce(device_type, 'desktop') AS k, count(*)::int AS views,
                     count(DISTINCT visitor_id)::int AS visitors
                FROM page_views WHERE day >= $1 AND day <= $2 AND is_bot = false
@@ -286,7 +302,7 @@ export async function buildReport(days: number): Promise<Report> {
           )
         : Promise.resolve([] as Record<string, unknown>[]),
       hasViews
-        ? query(
+        ? q(
             `SELECT coalesce(browser, 'Outro') AS k, count(*)::int AS views
                FROM page_views WHERE day >= $1 AND day <= $2 AND is_bot = false
               GROUP BY 1 ORDER BY views DESC LIMIT 6`,
@@ -294,7 +310,7 @@ export async function buildReport(days: number): Promise<Report> {
           )
         : Promise.resolve([] as Record<string, unknown>[]),
       hasViews
-        ? query(
+        ? q(
             `SELECT coalesce(country, '—') AS k, count(*)::int AS views,
                     count(DISTINCT visitor_id)::int AS visitors
                FROM page_views WHERE day >= $1 AND day <= $2 AND is_bot = false
@@ -303,7 +319,7 @@ export async function buildReport(days: number): Promise<Report> {
           )
         : Promise.resolve([] as Record<string, unknown>[]),
       hasViews
-        ? query(
+        ? q(
             `WITH f AS (
                 SELECT DISTINCT ON (session_id) session_id, path
                   FROM page_views WHERE day >= $1 AND day <= $2 AND is_bot = false
@@ -313,7 +329,7 @@ export async function buildReport(days: number): Promise<Report> {
           )
         : Promise.resolve([] as Record<string, unknown>[]),
       hasViews
-        ? query(
+        ? q(
             `WITH l AS (
                 SELECT DISTINCT ON (session_id) session_id, path
                   FROM page_views WHERE day >= $1 AND day <= $2 AND is_bot = false
@@ -323,7 +339,7 @@ export async function buildReport(days: number): Promise<Report> {
           )
         : Promise.resolve([] as Record<string, unknown>[]),
       hasViews
-        ? query(
+        ? q(
             `SELECT to_char(created_at AT TIME ZONE 'America/Sao_Paulo', 'HH24')::int AS h,
                     count(*)::int AS views
                FROM page_views WHERE day >= $1 AND day <= $2 AND is_bot = false
@@ -332,13 +348,13 @@ export async function buildReport(days: number): Promise<Report> {
           )
         : Promise.resolve([] as Record<string, unknown>[]),
       hasViews
-        ? query(
+        ? q(
             `SELECT day, count(*)::int AS views FROM page_views
               WHERE day >= $1 AND day <= $2 AND is_bot = false GROUP BY day`,
             [from, to],
           )
         : Promise.resolve([] as Record<string, unknown>[]),
-      query(
+      q(
         `SELECT to_char(created_at AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM-DD') AS day,
                 count(*)::int AS signups,
                 count(*) FILTER (WHERE ${PAID_SQL})::int AS paid
@@ -348,7 +364,7 @@ export async function buildReport(days: number): Promise<Report> {
           GROUP BY 1`,
         [daysSafe],
       ),
-      query(
+      q(
         `SELECT count(*)::int AS n FROM users u
           WHERE u.created_at::date >= (CURRENT_DATE - $1::int) AND u.created_at::date < (CURRENT_DATE - $1::int)
             AND ${REAL_USERS_SQL}`,
@@ -391,7 +407,7 @@ export async function buildReport(days: number): Promise<Report> {
   // comparação com o período anterior (para o "desempenho")
   const prevAgg = hasViews
     ? (
-        await query(
+        await q(
           `SELECT count(*)::int AS views, count(DISTINCT visitor_id)::int AS visitors,
                   count(DISTINCT session_id)::int AS sessions
              FROM page_views WHERE day >= $1 AND day < $2 AND is_bot = false`,
@@ -454,7 +470,7 @@ export async function buildReport(days: number): Promise<Report> {
   /* ------------------------------- assinantes ------------------------------ */
 
   const stats = (
-    await query(
+    await q(
       `SELECT count(*)::int AS total,
               count(*) FILTER (WHERE created_at >= (CURRENT_DATE - ($1::int) * interval '1 day'))::int AS new_in_period,
               count(*) FILTER (WHERE plan_status = 'trialing' AND trial_ends_at > now())::int AS trials_active,
@@ -472,7 +488,7 @@ export async function buildReport(days: number): Promise<Report> {
   const activeLast7 = hasViews
     ? int(
         (
-          await query(
+          await q(
             `SELECT count(DISTINCT user_id)::int AS n FROM page_views
               WHERE user_id IS NOT NULL AND day >= to_char(now() - interval '7 days', 'YYYY-MM-DD')
                 AND user_id NOT IN (SELECT id FROM users WHERE is_test = true)`,
@@ -481,13 +497,13 @@ export async function buildReport(days: number): Promise<Report> {
       )
     : 0;
 
-  const byStatusRows = await query(
+  const byStatusRows = await q(
     `SELECT plan_status AS k, count(*)::int AS n FROM users u
       WHERE ${REAL_USERS_SQL} GROUP BY 1 ORDER BY 2 DESC`,
   ).catch(() => [] as Record<string, unknown>[]);
 
   // Contas de teste: lista própria, fora de todos os números.
-  const testRows = await query(
+  const testRows = await q(
     `SELECT u.id, u.name, u.email, u.plan_status,
             to_char(u.created_at AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM-DD') AS day
        FROM users u
@@ -504,7 +520,7 @@ export async function buildReport(days: number): Promise<Report> {
     }[s] ?? s;
   };
 
-  const recentRows = await query(
+  const recentRows = await q(
     `WITH ft AS (
         SELECT DISTINCT ON (user_id) user_id, channel, referrer_domain, path
           FROM page_views WHERE user_id IS NOT NULL AND is_bot = false
@@ -519,7 +535,7 @@ export async function buildReport(days: number): Promise<Report> {
   ).catch(() => [] as Record<string, unknown>[]);
 
   const attributionRows = hasViews
-    ? await query(
+    ? await q(
         `WITH ft AS (
             SELECT DISTINCT ON (user_id) user_id, channel
               FROM page_views WHERE user_id IS NOT NULL AND is_bot = false
@@ -533,7 +549,7 @@ export async function buildReport(days: number): Promise<Report> {
     : [];
 
   const landingRows = hasViews
-    ? await query(
+    ? await q(
         `WITH ft AS (
             SELECT DISTINCT ON (user_id) user_id, path
               FROM page_views WHERE user_id IS NOT NULL AND is_bot = false
@@ -622,11 +638,11 @@ export async function buildReport(days: number): Promise<Report> {
   let contact: Report["contact"] = { unread: 0, total: 0, rows: [] };
   if (hasMessages) {
     const agg = (
-      await query(
+      await q(
         `SELECT count(*)::int AS total, count(*) FILTER (WHERE status = 'novo')::int AS unread FROM contact_messages`,
       )
     )[0] ?? {};
-    const rows = await query(
+    const rows = await q(
       `SELECT id, name, email, phone, topic, body, status, email_sent, email_error,
               source_path, reply_to_email, user_id, created_at
          FROM contact_messages ORDER BY created_at DESC LIMIT 60`,
@@ -656,7 +672,7 @@ export async function buildReport(days: number): Promise<Report> {
 
   const requests: RequestReport = { refunds: [], refundsPending: 0, dataRequests: [] };
   try {
-    const rows = await query(
+    const rows = await q(
       `SELECT id, name, email, payment_id, payment_provider, payment_status, payment_amount,
               paid_at, refund_status, refund_requested_at
          FROM users
@@ -698,7 +714,7 @@ export async function buildReport(days: number): Promise<Report> {
 
   if (await tableExists("data_subject_requests")) {
     try {
-      const rows = await query(
+      const rows = await q(
         `SELECT id, request_type, status, created_at, completed_at
            FROM data_subject_requests ORDER BY created_at DESC LIMIT 60`,
       );
@@ -715,8 +731,9 @@ export async function buildReport(days: number): Promise<Report> {
   }
 
   return {
-    ok: !problems.length,
+    ok: !problems.length && !failures.length,
     problems,
+    failures,
     range: { days: daysSafe, from, to, label: today },
     visits: hasViews ? visitsReport : null,
     subscribers,

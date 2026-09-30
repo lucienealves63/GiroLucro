@@ -116,6 +116,12 @@ function envStatus(report: Report, req: Request) {
         ? "⚠️ Ninguém definiu ADMIN_SETUP_TOKEN — o painel está usando o valor padrão “girolucro-setup”. Troque na Vercel."
         : "Definido. Só você com o token entra no painel.",
     },
+    "Consultas do painel": {
+      ok: !report.failures.length,
+      detail: report.failures.length
+        ? `Algumas consultas falharam e foram ignoradas: ${esc(report.failures.join(" · "))}. Normalmente é uma migração do banco que ainda não rodou — use o setup acima.`
+        : "Todas as consultas do painel responderam sem erro.",
+    },
     "APP_URL (links de e-mail)": {
       ok: getAppUrlSource() !== "FALLBACK_LOCALHOST",
       detail: `Hoje: ${esc(getAppUrl(req))} (origem: ${getAppUrlSource()}).`,
@@ -124,7 +130,35 @@ function envStatus(report: Report, req: Request) {
   return status;
 }
 
+/** Página de erro amigável: o painel nunca deve devolver um 500 em branco. */
+function errorPage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return layout({
+    title: "Painel indisponível",
+    active: "diagnostico",
+    tabs: [],
+    ranges: [],
+    children:
+      note(
+        "err",
+        "O painel não conseguiu carregar",
+        "Isso quase sempre é o banco de dados fora do ar ou uma migração que ainda não rodou. Os dados do app estão intactos — tente de novo em instantes.",
+      ) +
+      `<div class="card"><h3>Detalhe técnico</h3><pre class="mono">${esc(message)}</pre>` +
+      `<p class="muted">Rode o setup em <code>/api/admin/setup?token=SEU_TOKEN</code> para criar/atualizar as tabelas e recarregue esta página.</p></div>`,
+  });
+}
+
 export async function GET(req: Request) {
+  try {
+    return await handleGet(req);
+  } catch (error) {
+    console.error("[admin] falha ao montar o painel:", error);
+    return html(errorPage(error), 200);
+  }
+}
+
+async function handleGet(req: Request) {
   const url = new URL(req.url);
   const access = await checkAdminAccess(req);
 
