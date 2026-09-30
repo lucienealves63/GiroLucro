@@ -35,7 +35,7 @@ type SetupStatement = {
 /** E-mail do dono como literal SQL (aspas simples duplicadas). */
 const OWNER_TEST_EMAIL_SQL = `'${OWNER_TEST_EMAIL.replace(/'/g, "''")}'`;
 
-export const STATEMENTS: SetupStatement[] = [
+const RAW_STATEMENTS: SetupStatement[] = [
   {
     name: "billing_events",
     kind: "table",
@@ -420,6 +420,21 @@ export const STATEMENTS: SetupStatement[] = [
             ) AS ok`,
   },
 ];
+
+
+/**
+ * Ordem de execução: tabela → coluna → índice → dados.
+ *
+ * Um índice pode depender de uma coluna adicionada por migração (é o caso de
+ * `expenses_user_station_idx`, que usa `expenses.station`). Ordenando por tipo
+ * — de forma estável, preservando a ordem de escrita dentro de cada grupo — o
+ * índice nunca roda antes da coluna existir, e o setup para de acusar ERRO.
+ */
+const KIND_ORDER: Record<SetupKind, number> = { table: 0, column: 1, index: 2, data: 3 };
+
+export const STATEMENTS: SetupStatement[] = RAW_STATEMENTS.map((st, i) => ({ st, i }))
+  .sort((a, b) => KIND_ORDER[a.st.kind] - KIND_ORDER[b.st.kind] || a.i - b.i)
+  .map(({ st }) => st);
 
 
 export async function alreadyExists(st: SetupStatement): Promise<boolean> {
