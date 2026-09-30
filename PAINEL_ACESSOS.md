@@ -29,9 +29,13 @@ não apaga nem duplica nada que já existe. Quem usa terminal pode rodar
 
 ## 2. Entrar no painel
 
+Entre no app com a conta do dono (`lucieealves63@gmail.com`) e abra
+`https://SEU-DOMINIO/admin`: a sessão já autenticada dá acesso direto. Também é
+possível usar o token:
+
 ```
 https://SEU-DOMINIO/admin?token=SEU_TOKEN      → já entra direto
-https://SEU-DOMINIO/admin                       → pede o token numa tela de login
+https://SEU-DOMINIO/admin                       → pede o token se o dono não estiver logado
 ```
 
 O token é a mesma variável `ADMIN_SETUP_TOKEN` do setup. No login por tela o
@@ -142,7 +146,7 @@ planilha, caso precise.
 
 ## 8. Contas de teste (acesso liberado, fora dos números)
 
-Sua conta administrativa (`lucienealves63@gmail.com`), contas de QA e qualquer
+Sua conta administrativa (`lucieealves63@gmail.com`), contas de QA e qualquer
 conta que você use para **testar o app** não podem contar como cliente nem
 distorcer a conversão. Para isso existe a marca de **conta de teste**
 (`users.is_test`), controlada em **`/admin?aba=assinantes`** → card
@@ -166,10 +170,10 @@ continuam contando como acesso — a medição é anônima e não vinculada ao c
 Para não se contar enquanto mexe no app, use
 `localStorage.setItem('gl_analytics_off','1')` (seção 4).
 
-A conta administrativa é marcada **automaticamente** na primeira vez que esta
-versão roda (`users.is_test_owner`, no boot — ver `src/db/schema-ensure.ts`), se
-a conta já existir. Se você criar a conta depois, use o card. Para apontar a
-marcação automática para outro e-mail, defina `OWNER_TEST_EMAIL` na Vercel.
+A conta administrativa é marcada **automaticamente**: no cadastro, se ainda não
+existir, ou no primeiro boot desta versão (`users.is_test_owner`), se já estiver
+no banco. Para apontar a conta administrativa para outro e-mail, defina
+`OWNER_TEST_EMAIL` na Vercel.
 
 ## Segurança
 

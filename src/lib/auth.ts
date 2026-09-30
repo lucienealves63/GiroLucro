@@ -42,13 +42,8 @@ export async function destroySession(token: string) {
   await db.delete(sessions).where(eq(sessions.token, token));
 }
 
-/**
- * Lê o usuário da sessão atual (server components e route handlers).
- * Retorna null se não autenticado.
- */
-export async function getSessionUser(): Promise<User | null> {
-  const store = await cookies();
-  const token = store.get(SESSION_COOKIE)?.value;
+/** Valida um token de sessão e devolve seu usuário. */
+export async function getSessionUserByToken(token: string | null | undefined): Promise<User | null> {
   if (!token) return null;
   const now = new Date();
   const rows = await db
@@ -56,9 +51,13 @@ export async function getSessionUser(): Promise<User | null> {
     .from(sessions)
     .innerJoin(users, eq(sessions.userId, users.id))
     .where(and(eq(sessions.token, token), gt(sessions.expiresAt, now)));
-  const row = rows[0];
-  if (!row) return null;
-  return row.user;
+  return rows[0]?.user ?? null;
+}
+
+/** Lê o usuário da sessão atual (server components e route handlers). */
+export async function getSessionUser(): Promise<User | null> {
+  const store = await cookies();
+  return getSessionUserByToken(store.get(SESSION_COOKIE)?.value);
 }
 
 /** Guarda para páginas: exige login (e opcionalmente acesso ativo). */
