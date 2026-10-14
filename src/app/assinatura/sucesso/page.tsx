@@ -1,20 +1,41 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getSessionUser, hasAccess } from "@/lib/auth";
+import { isTestAccount } from "@/lib/test-accounts";
+import { isMercadoPagoConfigured } from "@/lib/mercado-pago";
+import { verifyPendingPayment } from "@/lib/billing-activation";
 import { CheckCircle2, Home, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
 async function SuccessContent() {
-  const initialUser = await getSessionUser();
-  if (!initialUser) redirect("/entrar");
+  let user = await getSessionUser();
+  if (!user) redirect("/entrar");
 
   // O webhook pode chegar poucos segundos depois do redirecionamento do checkout.
   await new Promise((resolve) => setTimeout(resolve, 2000));
-  const refreshedUser = await getSessionUser();
-  const canAccess = refreshedUser ? hasAccess(refreshedUser) : false;
-  const firstName = (refreshedUser?.name ?? "").split(" ")[0];
+  user = (await getSessionUser()) ?? user;
+
+  // Verificação ATIVA: não depende do webhook. Se o webhook não chegou
+  // (comum em ambiente de teste), consulta o Mercado Pago diretamente pela
+  // cobrança vinculada à conta e libera o vitalício na hora.
+  if (!hasAccess(user) && !isTestAccount(user) && isMercadoPagoConfigured()) {
+    try {
+      const outcome = await verifyPendingPayment(user);
+      if (outcome.activation?.activated) {
+        user = (await getSessionUser()) ?? user;
+      }
+    } catch (e) {
+      console.error(
+        "[assinatura] verificação ativa pós-checkout falhou:",
+        e instanceof Error ? e.message : e,
+      );
+    }
+  }
+
+  const canAccess = hasAccess(user);
+  const firstName = (user.name ?? "").split(" ")[0];
 
   return (
     <div className="flex flex-col items-center justify-center min-h-dvh gap-6 px-6 text-center">

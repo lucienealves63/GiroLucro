@@ -142,18 +142,37 @@ export function BillingClient({
     }
   };
 
+  type VerifyResponse = {
+    ok?: boolean;
+    activated?: boolean;
+    alreadyActive?: boolean;
+    checked?: boolean;
+    hasAccess?: boolean;
+    planStatus?: string | null;
+    error?: string;
+  };
+
+  // Verificação ATIVA: pergunta ao Mercado Pago o resultado da cobrança
+  // vinculada à conta — não depende do webhook chegar.
+  const verifyPayment = async (): Promise<boolean> => {
+    const res = await fetch("/api/billing/verify", { method: "POST" });
+    const data = (await res.json().catch(() => ({}))) as VerifyResponse;
+    if (res.ok && data.ok && (data.activated || data.alreadyActive || data.hasAccess)) {
+      setPix(null);
+      router.push("/");
+      router.refresh();
+      return true;
+    }
+    return false;
+  };
+
   const checkPix = async () => {
     setCheckingPix(true);
     try {
-      const res = await fetch("/api/billing/status");
-      const data = (await res.json().catch(() => ({}))) as { planStatus?: string };
-      if (res.ok && data.planStatus === "active") {
-        setPix(null);
-        router.push("/");
-        router.refresh();
-        return;
+      const confirmed = await verifyPayment();
+      if (!confirmed) {
+        show("Ainda não confirmamos o pagamento. Você pode verificar de novo.");
       }
-      show("Ainda não confirmamos o pagamento. Você pode verificar de novo.");
     } catch {
       show("Não foi possível verificar agora. Tente novamente.");
     } finally {
@@ -166,14 +185,21 @@ export function BillingClient({
     setPixRemaining(0);
   };
 
-  // Polling do status: ao confirmar, volta para o app.
+  // Polling do status: cada tick faz verificação ativa no Mercado Pago,
+  // então o acesso libera sozinho mesmo que o webhook não chegue.
   useEffect(() => {
     if (!pix) return;
+    let cancelled = false;
     const timer = setInterval(async () => {
       try {
-        const res = await fetch("/api/billing/status");
-        const data = (await res.json().catch(() => ({}))) as { planStatus?: string };
-        if (res.ok && data.planStatus === "active") {
+        const res = await fetch("/api/billing/verify", { method: "POST" });
+        const data = (await res.json().catch(() => ({}))) as VerifyResponse;
+        if (
+          !cancelled &&
+          res.ok &&
+          data.ok &&
+          (data.activated || data.alreadyActive || data.hasAccess)
+        ) {
           setPix(null);
           router.push("/");
           router.refresh();
@@ -182,7 +208,10 @@ export function BillingClient({
         // rede momentânea: o próximo tick tenta de novo
       }
     }, 8_000);
-    return () => clearInterval(timer);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
   }, [pix, router]);
 
   // Regressivo do QR Code.
@@ -219,7 +248,7 @@ export function BillingClient({
         ) : (
           status === "active" && (
             <span className="flex items-center gap-1.5 rounded-full border border-volt-400/30 bg-volt-400/10 px-3 py-1.5 text-[10.5px] font-bold text-volt-300">
-              <Crown className="h-3.5 w-3.5" /> PRO
+              <Crown className="h-3.5 w-3.5" /> {cycle === "lifetime" ? "PRO VITALÍCIO" : "PRO"}
             </span>
           )
         )}
@@ -245,7 +274,7 @@ export function BillingClient({
         ) : status === "active" ? (
           <>
             <h1 className="font-display text-[28px] font-bold leading-tight tracking-tight text-zinc-50">
-              Você é Pro, {firstName}.
+              Você é Pro vitalício, {firstName}.
             </h1>
             <p className="mt-2 text-[13.5px] leading-relaxed text-zinc-400">
               Acesso total liberado
@@ -255,7 +284,7 @@ export function BillingClient({
                   · válido até <span className="font-semibold text-volt-300">{periodEnd}</span>
                 </>
               ) : null}
-              {cycle ? " · pagamento único." : "."}
+              {cycle ? " · pagamento único, sem expiração." : "."}
             </p>
           </>
         ) : status === "trialing" ? (

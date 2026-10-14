@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { BadgeCheck, Clock3, Loader2, Receipt, RotateCcw, TriangleAlert } from "lucide-react";
+import { BadgeCheck, Clock3, Crown, Loader2, Receipt, RotateCcw, TriangleAlert } from "lucide-react";
 import clsx from "clsx";
 import { Modal } from "@/components/modal";
 import { SectionTitle, Toast, useToast } from "@/components/ui";
@@ -18,6 +18,10 @@ export type PurchaseInfo = {
   provider: string | null;
   paymentId: string | null;
   paymentStatus: string | null;
+  /** Estado do plano na conta (active | trialing | pending_payment | canceled). */
+  planStatus: string | null;
+  /** Ciclo gravado no banco — `lifetime` = vitalício (pagamento único). */
+  planCycle: string | null;
   refundStatus: string | null;
   refundRequestedAt: string | null;
   refundedAt: string | null;
@@ -151,9 +155,57 @@ export function MyPurchaseSection({
         </div>
       ) : (
         <div className="rounded-3xl border border-white/[0.07] bg-white/[0.02] p-5">
+          {/* Demonstração do estado vitalício da conta após a compra */}
+          {purchase.paymentStatus === "approved" && (
+            <div
+              className={clsx(
+                "mb-4 flex items-start gap-2.5 rounded-2xl border px-3.5 py-3",
+                purchase.planStatus === "active"
+                  ? "border-volt-400/30 bg-volt-400/[0.08]"
+                  : "border-amber-400/25 bg-amber-400/[0.07]",
+              )}
+            >
+              {purchase.planStatus === "active" ? (
+                <Crown className="mt-0.5 h-4 w-4 shrink-0 text-volt-300" aria-hidden="true" />
+              ) : (
+                <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" aria-hidden="true" />
+              )}
+              <div>
+                {purchase.planStatus === "active" ? (
+                  <>
+                    <p className="text-[12.5px] font-bold text-volt-200">
+                      Acesso Pro vitalício confirmado nesta conta
+                    </p>
+                    <p className="mt-0.5 text-[11.5px] leading-relaxed text-zinc-400">
+                      Compra aprovada — o Pro fica liberado sem mensalidade, sem renovação
+                      automática e sem data de expiração.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-[12.5px] font-bold text-amber-200">
+                      Pagamento confirmado — liberando o acesso Pro
+                    </p>
+                    <p className="mt-0.5 text-[11.5px] leading-relaxed text-zinc-400">
+                      A confirmação pode levar alguns segundos. Atualize a página ou toque em
+                      “Já paguei, verificar” na tela de assinatura.
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
           <dl className="flex flex-col gap-2 text-[12.5px]">
             {[
               { label: "Produto", value: PRO_PRODUCT_NAME },
+              {
+                label: "Plano",
+                value:
+                  purchase.planCycle === "lifetime"
+                    ? "Vitalício — pagamento único, sem renovação"
+                    : "Pagamento único",
+              },
               { label: "Data da compra", value: formatDate(purchase.paidAt) },
               {
                 label: "Valor pago",

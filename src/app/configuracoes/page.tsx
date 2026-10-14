@@ -32,7 +32,7 @@ export default async function ConfiguracoesPage() {
       user.planCycle === null ||
       user.currentPeriodEnd.getFullYear() >= 2100;
     planLabel = isSinglePayment
-      ? "Pro · pagamento único"
+      ? "Pro vitalício · pagamento único"
       : `Pro · até ${user.currentPeriodEnd.toLocaleDateString("pt-BR")}`;
   } else if (user.planStatus === "canceled" && hasAccess(user) && user.currentPeriodEnd) {
     planLabel = `Pro até ${user.currentPeriodEnd.toLocaleDateString("pt-BR")}`;
@@ -66,6 +66,8 @@ export default async function ConfiguracoesPage() {
     provider: user.paymentProvider ?? null,
     paymentId: user.paymentId ?? null,
     paymentStatus: user.paymentStatus ?? null,
+    planStatus: user.planStatus,
+    planCycle: user.planCycle,
     refundStatus: user.refundStatus ?? null,
     refundRequestedAt: user.refundRequestedAt?.toISOString() ?? null,
     refundedAt: user.refundedAt?.toISOString() ?? null,
