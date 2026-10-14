@@ -75,6 +75,25 @@ O webhook do GiroLucro:
 - é idempotente: reenvio do mesmo evento não libera duas vezes nem gera recibo duplicado;
 - trata `refunded` e `charged_back` mantendo o histórico de reembolso em dia.
 
+### 3.1 Verificação ativa — o app não depende só do webhook
+
+O webhook é o caminho oficial, mas pode não chegar (ambiente de teste/sandbox do
+Mercado Pago, domínio ainda não público, tentativa perdida). Por isso o GiroLucro
+também faz **verificação ativa**:
+
+- a tela de assinatura consulta o Mercado Pago a cada poucos segundos enquanto o
+  QR Code/Pix está aberto e no botão **“Já paguei, verificar”**;
+- a página de sucesso pós-checkout (`/assinatura/sucesso`) confirma direto na API;
+- tudo passa por `POST /api/billing/verify`, que revalida referência do usuário,
+  valor (R$ 19,90), moeda BRL e status `approved` antes de liberar — e grava os
+  mesmos registros do webhook (compra, recibo e evento idempotente em
+  `billing_events`).
+
+Na prática: mesmo sem webhook configurado, o pagamento aprovado no Mercado Pago
+libera o Pro em segundos (polling automático ou um toque em “Já paguei,
+verificar”) e a conta passa a exibir o acesso **Pro vitalício** em
+Configurações → Minha compra.
+
 ## 4. Configurar a URL pública
 
 Na Vercel, crie também:

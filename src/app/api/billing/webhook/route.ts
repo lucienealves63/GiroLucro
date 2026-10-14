@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { billingEvents, users, type User } from "@/db/schema";
-import { DEFAULT_PLAN, resolvePlan, type Plan } from "@/lib/billing";
+import { resolvePlan, type Plan } from "@/lib/billing";
+import { buildLifetimeUserUpdate } from "@/lib/billing-activation";
 import { sendPurchaseReceipt } from "@/lib/purchase";
 import {
   getAuthorizedPayment,
@@ -84,25 +85,12 @@ async function activateLifetime(
     paidAt?: Date;
   },
 ) {
-  const currentPeriodEnd = new Date(Date.now() + DEFAULT_PLAN.days * 86400000);
   await db.transaction(async (tx) => {
+    // Mesmos campos da verificação ativa (`src/lib/billing-activation.ts`),
+    // para que webhook e "Já paguei, verificar" deixem a conta idêntica.
     await tx
       .update(users)
-      .set({
-        planStatus: "active",
-        planCycle: "lifetime",
-        currentPeriodEnd,
-        // Registro comercial da compra (recibo, reembolso e guarda fiscal).
-        ...(payment
-          ? {
-              paymentId: String(payment.id),
-              paymentProvider: payment.provider,
-              paidAt: payment.paidAt ?? new Date(),
-              ...(Number.isFinite(payment.amount) ? { paymentAmount: payment.amount } : {}),
-              paymentStatus: "approved",
-            }
-          : {}),
-      })
+      .set(buildLifetimeUserUpdate(payment))
       .where(eq(users.id, userId));
     await tx
       .update(billingEvents)

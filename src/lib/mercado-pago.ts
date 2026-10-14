@@ -210,6 +210,25 @@ export function getPixPayment(id: string): Promise<MercadoPagoPixPayment> {
   return mpFetch(`/v1/payments/${encodeURIComponent(id)}`);
 }
 
+export interface MercadoPagoPaymentSearch {
+  paging?: { total?: number; offset?: number; limit?: number };
+  results?: MercadoPagoPayment[];
+}
+
+/**
+ * Pagamentos de uma preferência do Checkout Pro (pagamento único).
+ * Usado pela verificação ativa: quando o webhook não chega, o app busca
+ * diretamente o resultado da cobrança que criou para a conta.
+ */
+export async function searchPaymentsByPreference(
+  preferenceId: string,
+): Promise<MercadoPagoPayment[]> {
+  const data = await mpFetch<MercadoPagoPaymentSearch>(
+    `/v1/payments/search?sort=date_created&criteria=desc&preference_id=${encodeURIComponent(preferenceId)}`,
+  );
+  return Array.isArray(data?.results) ? data.results : [];
+}
+
 /** Gera um Pix à vista (pagamento único) e retorna o QR Code. */
 export async function createPixCharge({
   userId,
